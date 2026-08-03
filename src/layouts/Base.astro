@@ -33,9 +33,19 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? site.url).href;
     <link rel="preload" as="font" type="font/woff2" href="/fonts/jetbrains-mono-var.woff2" crossorigin />
     <link rel="preload" as="font" type="font/woff2" href="/fonts/barlow-condensed-600.woff2" crossorigin />
     <link rel="alternate" type="application/rss+xml" title={site.title} href="/rss.xml" />
+
+    {/* 先于首次绘制定好日/夜，避免切换时闪一下 */}
+    <script is:inline>
+      document.documentElement.dataset.mode = localStorage.getItem('chart-mode') || 'day';
+      // 只有确认 JS 跑得起来才允许「进场前隐藏」，否则内容照常显示
+      if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        document.documentElement.classList.add('js');
+      }
+    </script>
   </head>
   <body>
     <main class="sheet">
+      <span class="grain" aria-hidden="true"></span>
       <Sheet />
       <slot />
       <footer class="foot">
@@ -45,5 +55,8 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? site.url).href;
         </span>
       </footer>
     </main>
+    <script>
+      import '../scripts/site';
+    </script>
   </body>
 </html>

@@ -30,18 +30,24 @@ const status = [
   <header class="titleblock">
     <div class="tb-strip">
       <span>个人主页 · PERSONAL CHART</span>
-      <span>{site.callsign} · {stamp}</span>
+      <span class="right">
+        <span data-bearing-readout>HDG 000°</span>
+        <span>{site.callsign} · <span data-zulu>{stamp}</span></span>
+        <button class="mode" type="button" data-theme-toggle>DAY</button>
+      </span>
     </div>
 
     <div class="tb-main">
-      <h1>围城<span class="en">Weichen Li</span></h1>
-      <p class="tagline">18 岁，做 AI 产品。能定义产品，也能自己把它写完。</p>
+      <h1 data-reveal>围城<span class="en">Weichen Li</span></h1>
+      <p class="tagline" data-reveal style="--delay:90ms">
+        18 岁，做 AI 产品。能定义产品，也能自己把它写完。
+      </p>
     </div>
 
     <div class="tb-data">
       {
-        status.map((s) => (
-          <div class="cell">
+        status.map((s, i) => (
+          <div class="cell" data-reveal style={`--delay:${140 + i * 70}ms`}>
             <span class="k">{s.k}</span>
             <span class={`v${s.amber ? ' amber' : ''}`}>{s.v}</span>
           </div>
@@ -66,7 +72,7 @@ const status = [
     </ul>
   </header>
 
-  <section class="block">
+  <section class="block" data-bearing="30">
     <h2>关于</h2>
     <div class="body bio">
       <p>
@@ -76,15 +82,16 @@ const status = [
     </div>
   </section>
 
-  <section class="block">
+  <section class="block" data-bearing="135">
     <h2>作品</h2>
     <div class="body">
       <ol class="route">
+        <span class="route-progress" aria-hidden="true" />
         {
           projects.map((p, i) => (
             <li class={`wpt${p.active ? ' active' : ''}`}>
               <span class="pt" />
-              <div class="card">
+              <div class="card" data-reveal>
                 <span class="idx">WPT {String(i + 1).padStart(2, '0')}</span>
                 <h3>
                   {p.href ? (
@@ -111,7 +118,7 @@ const status = [
     </div>
   </section>
 
-  <section class="block">
+  <section class="block" data-bearing="255">
     <h2>文章</h2>
     <div class="body">
       {
@@ -120,7 +127,7 @@ const status = [
         ) : (
           <ul class="posts">
             {posts.map((post) => (
-              <li>
+              <li data-reveal>
                 <span class="d">{fmt(post.data.date)}</span>
                 <a class="t" href={`/log/${post.id}/`}>
                   {post.data.title}
