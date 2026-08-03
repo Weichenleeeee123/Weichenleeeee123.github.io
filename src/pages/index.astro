@@ -1,112 +1,124 @@
 ---
 import Base from '../layouts/Base.astro';
-import Hud from '../components/Hud.astro';
-import Route from '../components/Route.astro';
 import { getCollection } from 'astro:content';
+import { projects } from '../data/projects';
+import { links, site } from '../data/site';
 
-const work = await getCollection('work');
-const posts = (await getCollection('posts', ({ data }) => !data.draft))
-  .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf())
-  .slice(0, 3);
+const posts = (await getCollection('posts', ({ data }) => !data.draft)).sort(
+  (a, b) => b.data.date.valueOf() - a.data.date.valueOf()
+);
 
 const fmt = (d: Date) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+
+/* 航图/气象报文式的时间戳：日 时 分 Z，随每次构建更新 */
+const now = new Date();
+const p2 = (n: number) => String(n).padStart(2, '0');
+const stamp = `${p2(now.getUTCDate())}${p2(now.getUTCHours())}${p2(now.getUTCMinutes())}Z`;
 ---
 
 <Base>
-  <Hud waypoints={work.length} />
-  <Route />
-
-  <section class="sec wrap">
-    <div class="sechead">
-      <h2 class="cond">LOG</h2>
-      <span class="rule" aria-hidden="true"></span>
-      <a class="mono more" href="/log">全部 →</a>
+  <header class="masthead">
+    <div class="callsign">
+      <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true">
+        <rect
+          x="3"
+          y="3"
+          width="10"
+          height="10"
+          transform="rotate(45 8 8)"
+          fill="none"
+          stroke="#b8225e"
+          stroke-width="1.6"></rect>
+      </svg>
+      <span>{site.callsign} · {stamp}</span>
     </div>
 
-    <ul class="posts">
+    <h1>围城<span class="en">Weichen Li</span></h1>
+    <p class="tagline">18 岁，做 AI 产品。能定义产品，也能自己把它写完。</p>
+
+    <div class="status">
+      <div><span class="k">在做</span>KinoLens，重写它的剪辑决策层</div>
+      <div><span class="k">在找</span><span class="amber">AI 产品方向的远程实习</span></div>
+      <div><span class="k">在学</span>多智能体编排，以及怎么把话说清楚</div>
+    </div>
+
+    <ul class="links">
       {
-        posts.map((p) => (
+        links.map((l) => (
           <li>
-            <a href={`/log/${p.id}`}>
-              <span class="mono date">{fmt(p.data.date)}</span>
-              <span class="t">{p.data.title}</span>
-              <span class="s">{p.data.summary}</span>
-            </a>
+            {l.href ? (
+              <a href={l.href} rel={l.href.startsWith('http') ? 'me noopener' : undefined}>
+                {l.text}
+              </a>
+            ) : (
+              <span class="plain">{l.text}</span>
+            )}
           </li>
         ))
       }
     </ul>
+  </header>
+
+  <section class="bio">
+    <div class="section-head"><h2>关于</h2></div>
+    <p>
+      我习惯一个人把全程跑完：定义问题、写代码、部署上线、上台把它讲明白。做过的东西里，有拿奖的，也有到现在还不行的——两种我都放在下面了。
+    </p>
+    <p>
+      玩了六年模拟飞行，写了六年日记。这个站用来放作品和一些复盘，写得不勤，但写的都是真做过的事。
+    </p>
+  </section>
+
+  <section>
+    <div class="section-head"><h2>作品</h2></div>
+    <ol class="route">
+      {
+        projects.map((p, i) => (
+          <li class={`wpt${p.active ? ' active' : ''}`}>
+            <span class="pt" />
+            <span class="idx">WPT {String(i + 1).padStart(2, '0')}</span>
+            <h3>
+              {p.href ? (
+                <a href={p.href} target="_blank" rel="noopener">
+                  {p.name}
+                </a>
+              ) : (
+                p.name
+              )}
+              <span class="sub"> — {p.sub}</span>
+            </h3>
+            <p>{p.desc}</p>
+            <div class="meta">
+              {p.tags.map((t) => (
+                <span class={`tag${t.kind ? ' ' + t.kind : ''}`}>{t.text}</span>
+              ))}
+              {p.hrefText && <span>{p.hrefText}</span>}
+            </div>
+          </li>
+        ))
+      }
+    </ol>
+  </section>
+
+  <section>
+    <div class="section-head"><h2>文章</h2></div>
+    {
+      posts.length === 0 ? (
+        <p class="empty">还没有。</p>
+      ) : (
+        <ul class="posts">
+          {posts.map((post) => (
+            <li>
+              <span class="d">{fmt(post.data.date)}</span>
+              <a class="t" href={`/log/${post.id}/`}>
+                {post.data.title}
+              </a>
+              <p class="s">{post.data.summary}</p>
+            </li>
+          ))}
+        </ul>
+      )
+    }
   </section>
 </Base>
-
-<style>
-  .sec {
-    padding-top: clamp(3rem, 8vw, 5.5rem);
-  }
-  .sechead {
-    display: flex;
-    align-items: center;
-    gap: 1.1rem;
-    margin-bottom: clamp(1rem, 3vw, 1.8rem);
-  }
-  .sechead h2 {
-    margin: 0;
-    font-size: clamp(1.1rem, 2.6vw, 1.5rem);
-    color: var(--fg-dim);
-  }
-  .rule {
-    flex: 1;
-    height: 1px;
-    background: var(--rule);
-  }
-  .more {
-    font-size: 0.62rem;
-    color: var(--fg-dim);
-  }
-  .more:hover {
-    color: var(--route);
-  }
-  .posts {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-  .posts a {
-    display: grid;
-    grid-template-columns: 7.5rem minmax(0, 1fr);
-    gap: 0.2rem 1.5rem;
-    padding: 1.15rem 0;
-    border-bottom: 1px solid var(--rule);
-    transition: border-color 0.2s;
-  }
-  .posts a:hover {
-    border-color: var(--route);
-  }
-  .date {
-    font-size: 0.62rem;
-    color: var(--fg-faint);
-    padding-top: 0.35rem;
-  }
-  .t {
-    font-size: 1.06rem;
-    color: var(--fg);
-    transition: color 0.2s;
-  }
-  .posts a:hover .t {
-    color: var(--route);
-  }
-  .s {
-    grid-column: 2;
-    font-size: 0.86rem;
-    color: var(--fg-dim);
-  }
-  @media (max-width: 640px) {
-    .posts a {
-      grid-template-columns: 1fr;
-    }
-    .s {
-      grid-column: 1;
-    }
-  }
-</style>

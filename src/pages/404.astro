@@ -2,43 +2,10 @@
 import Base from '../layouts/Base.astro';
 ---
 
-<Base title="404" description="航路点不存在。">
-  <div class="wrap page">
-    <p class="mono code">ERR 404 · WAYPOINT NOT IN DATABASE</p>
-    <h1 class="cond">偏航</h1>
-    <p class="lede">这个航路点不在数据库里。可能是我改过链接，也可能你输错了。</p>
-    <div class="acts">
-      <a class="link" href="/">← 回到航线起点</a>
-      <a class="link" href="/log">去 LOG</a>
-    </div>
+<Base title="偏航">
+  <div class="lost">
+    <h1>404</h1>
+    <p>这个航路点不存在。</p>
+    <p><a href="/">← 回首页</a></p>
   </div>
 </Base>
-
-<style>
-  .page {
-    padding-top: clamp(4rem, 14vw, 9rem);
-    padding-bottom: clamp(4rem, 12vw, 8rem);
-  }
-  .code {
-    margin: 0 0 1.4rem;
-    color: var(--caution);
-    font-size: 0.66rem;
-  }
-  h1 {
-    margin: 0;
-    font-family: var(--font-cn);
-    font-weight: 700;
-    font-size: clamp(3rem, 12vw, 6rem);
-    letter-spacing: 0.06em;
-  }
-  .lede {
-    margin: 1.4rem 0 0;
-    max-width: 30em;
-    color: var(--fg-dim);
-  }
-  .acts {
-    display: flex;
-    gap: 1.6rem;
-    margin-top: 2.4rem;
-  }
-</style>

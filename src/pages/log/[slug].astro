@@ -1,90 +1,33 @@
 ---
 import Base from '../../layouts/Base.astro';
-import '../../styles/prose.css';
-import { getCollection, render } from 'astro:content';
+import { getCollection, render, type CollectionEntry } from 'astro:content';
 
 export async function getStaticPaths() {
   const posts = await getCollection('posts', ({ data }) => !data.draft);
-  return posts.map((entry) => ({ params: { slug: entry.id }, props: { entry } }));
+  return posts.map((post) => ({ params: { slug: post.id }, props: { post } }));
 }
 
-const { entry } = Astro.props;
-const { Content } = await render(entry);
-const d = entry.data;
-const fmt = (x: Date) =>
-  `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+type Props = { post: CollectionEntry<'posts'> };
+const { post } = Astro.props;
+const { Content } = await render(post);
 
-/** 中文按 450 字/分钟估算 */
-const chars = (entry.body ?? '').replace(/\s/g, '').length;
-const minutes = Math.max(1, Math.round(chars / 450));
+const d = post.data.date;
+const dateText = `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
 ---
 
-<Base title={d.title} description={d.summary} paper>
-  <article class="wrap page">
-    <p class="mono crumb"><a href="/log">LOG</a> / {fmt(d.date)}</p>
+<Base title={post.data.title} description={post.data.summary} rings={false}>
+  <a class="back" href="/">← 回首页</a>
 
-    <header class="hd">
-      <h1>{d.title}</h1>
-      <p class="lede">{d.summary}</p>
-      <p class="mono meta">
-        {fmt(d.date)} · 约 {minutes} 分钟 · {d.tags.join(' / ')}
-      </p>
+  <article class="article">
+    <header>
+      <div class="dateline">
+        <span>{dateText}</span>
+        {post.data.tags.map((t) => <span>{t}</span>)}
+      </div>
+      <h1>{post.data.title}</h1>
     </header>
-
     <div class="prose">
       <Content />
     </div>
-
-    <nav class="back">
-      <a class="link" href="/log">← 回到 LOG</a>
-    </nav>
   </article>
 </Base>
-
-<style>
-  .page {
-    padding-top: clamp(2rem, 6vw, 3.5rem);
-    padding-bottom: 2rem;
-  }
-  .crumb {
-    margin: 0 0 2.2rem;
-    font-size: 0.62rem;
-    color: var(--fg-faint);
-  }
-  .crumb a:hover {
-    color: var(--route);
-  }
-  .hd {
-    max-width: 24em;
-    padding-bottom: clamp(1.6rem, 4vw, 2.4rem);
-    margin-bottom: clamp(2rem, 5vw, 3rem);
-    border-bottom: 1px solid var(--rule);
-  }
-  h1 {
-    margin: 0;
-    font-family: var(--font-cn);
-    font-size: clamp(1.9rem, 5.4vw, 3.05rem);
-    font-weight: 700;
-    line-height: 1.28;
-    letter-spacing: 0.005em;
-  }
-  .lede {
-    margin: 1.3rem 0 0;
-    max-width: 34em;
-    color: var(--fg-dim);
-    font-size: 1rem;
-  }
-  .meta {
-    margin: 1.3rem 0 0;
-    font-size: 0.62rem;
-    color: var(--fg-faint);
-    text-transform: none;
-    letter-spacing: 0.1em;
-  }
-  .back {
-    max-width: 40em;
-    margin-top: clamp(3rem, 7vw, 5rem);
-    padding-top: 1.5rem;
-    border-top: 1px solid var(--rule);
-  }
-</style>

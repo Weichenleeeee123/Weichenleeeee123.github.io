@@ -1,69 +1,53 @@
 # weichenleeeee123.github.io
 
-围城 Weichen Li 的个人站。作品集 + 长文。
+个人站。Astro + 静态输出，GitHub Actions 自动部署到 GitHub Pages。
 
-**线上**：https://weichenleeeee123.github.io
-
-## 设计母题
-
-夜航驾驶舱 / 航图（Navigation Display）。首页是一条航线，作品是航路点，滚动等于沿航线飞过去。
-配色取自真实航电：**洋红 = 活动航路**、琥珀 = 注意、绿 = 正常。
-
-长文页面切换到「纸质航图」模式（浅色）——深色读三千字是自残。
-
-## 技术
-
-- Astro 5，静态输出，**零运行时框架**
-- 首页只有一段约 1KB 的内联 JS（滚动航线），其余页面零 JS
-- 字体自托管、只带 latin 子集（53KB），中文走系统字体，**不请求任何第三方域名**
-- 推 `main` 由 GitHub Actions 构建部署（`.github/workflows/deploy.yml`）
+## 本地跑
 
 ```bash
 npm install
 npm run dev      # http://localhost:4321
-npm run build    # 产物在 dist/
+npm run build    # 输出到 dist/
 ```
 
-## 怎么加东西
+## 写一篇新文章
 
-### 加一篇长文
-
-在 `src/content/posts/` 建一个 `.md`：
+在 `src/content/posts/` 下新建一个 `.md` 文件，文件名就是 URL（`/log/<文件名>/`）：
 
 ```markdown
 ---
 title: 标题
 date: 2026-08-10
-summary: 一句话说清这篇讲什么，会显示在列表和 SEO 里。
+summary: 一句话摘要，会出现在首页列表和 RSS 里
 tags: [KinoLens, 复盘]
-draft: false        # true 则不会被构建
+draft: false
 ---
 
 正文……
 ```
 
-文件名就是 URL：`kinolens-verdict.md` → `/log/kinolens-verdict`。
+`draft: true` 的文章不会出现在首页、RSS 和构建产物里。
 
-**正文里用中文引号「」，不要用直的 `"`**，否则会被转成一对右引号。
+## 改作品列表
 
-### 加一个作品
+编辑 `src/data/projects.ts`。每个项目：
 
-在 `src/content/work/` 建一个 `.md`。字段说明：
+- `name` / `sub`：名字和一句话定位
+- `desc`：两三句说清它是什么、现在什么状态
+- `href` / `hrefText`：外链（没有就不写，标题自动变成纯文本）
+- `tags`：`kind` 可选 `award`（琥珀）/ `wip`（洋红）/ `done`（绿）
+- `active: true`：航路点变实心，表示正在做
 
-| 字段 | 说明 |
-|---|---|
-| `wpt` | 航路点编号，决定在航线上的顺序 |
-| `status` | `active` / `awarded` / `shipped` / `merged` / `archived`，决定徽标颜色 |
-| `statusLabel` | 徽标上显示的中文，如「进行中」 |
-| `metrics` | 数据条，`{ k: 名称, v: 值 }`，**值里有日期或纯数字要加引号** |
-| `tier` | `primary` 出大卡，`secondary` 出紧凑行 |
-| `detail` | `true` 才生成 `/work/<文件名>` 详情页，正文写在 markdown 正文里 |
+顺序就是数组顺序，`WPT 01…` 编号自动生成。
 
-### 改身份信息
+## 改联系方式 / 状态
 
-`src/data/site.ts`——花名、实名、邮箱、社交链接、航班号、航线（`ZGGG→ZSNJ`）都在这。
+`src/data/site.ts` 管联系方式；首页 STATUS 面板的三行在 `src/pages/index.astro` 里。
 
-## 一条自己定的规矩
+## 部署
 
-首页 STATUS 面板写的是**当前真实状态**，不是装饰。它过期了就去改它。
-一个写着三个月前状态的仪表盘，比没有仪表盘更糟。
+推到 `main` 自动构建部署。首次需要在仓库 **Settings → Pages → Build and deployment → Source** 选 **GitHub Actions**。
+
+## 设计约定
+
+纸质航图：米白纸底 `#f5f2ea`、蓝灰细线、洋红航路 `#b8225e`。字体自托管在 `public/fonts/`（Barlow Condensed + JetBrains Mono，仅 latin 子集，共约 75 KB），中文走系统字体，不加载任何第三方资源。全站零 JavaScript。
