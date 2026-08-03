@@ -1,0 +1,95 @@
+---
+import { projects } from '../data/projects';
+
+const C = 200;
+const R = 150;
+
+const pts = projects.map((p, i) => {
+  const rad = ((p.brg - 90) * Math.PI) / 180;
+  return {
+    ...p,
+    i,
+    x: +(C + p.dist * R * Math.cos(rad)).toFixed(1),
+    y: +(C + p.dist * R * Math.sin(rad)).toFixed(1),
+    idx: String(i + 1).padStart(2, '0'),
+  };
+});
+
+const routeD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x} ${p.y}`).join(' ');
+const ticks = Array.from({ length: 12 }, (_, i) => i * 30);
+---
+
+<figure class="nd" data-nd>
+  <div class="nd-head">
+    <span>NAV DISPLAY</span>
+    <span data-nd-range>RNG 40</span>
+  </div>
+
+  <svg viewBox="0 0 400 400" role="img" aria-label="七个作品在导航图上的分布">
+    {/* 距离环 */}
+    <g class="nd-rings" fill="none" stroke="currentColor">
+      <circle cx="200" cy="200" r="50"></circle>
+      <circle cx="200" cy="200" r="100"></circle>
+      <circle cx="200" cy="200" r="150" stroke-dasharray="3 5"></circle>
+    </g>
+
+    {/* 方位刻度 */}
+    <g class="nd-ticks" stroke="currentColor">
+      {
+        ticks.map((deg) => {
+          const rad = ((deg - 90) * Math.PI) / 180;
+          const r1 = deg % 90 === 0 ? 158 : 165;
+          return (
+            <line
+              x1={C + r1 * Math.cos(rad)}
+              y1={C + r1 * Math.sin(rad)}
+              x2={C + 172 * Math.cos(rad)}
+              y2={C + 172 * Math.sin(rad)}
+            />
+          );
+        })
+      }
+    </g>
+
+    {/* 航路 */}
+    <path class="nd-route" d={routeD} pathLength="1" fill="none" stroke="currentColor"></path>
+
+    {/* 本机符号 */}
+    <g class="nd-ship">
+      <path d="M200 186 L208 214 L200 208 L192 214 Z"></path>
+    </g>
+
+    {/* 航路点 */}
+    <g class="nd-pts">
+      {
+        pts.map((p) => (
+          <g
+            class={`nd-pt${p.active ? ' active' : ''}`}
+            data-nd-pt={p.i}
+            style={`--i:${p.i}`}
+            tabindex="0"
+            role="button"
+            aria-label={`${p.name}，方位 ${p.brg} 度`}
+          >
+            <circle class="nd-hit" cx={p.x} cy={p.y} r="22"></circle>
+            <rect
+              class="nd-mark"
+              x={p.x - 5}
+              y={p.y - 5}
+              width="10"
+              height="10"
+              transform={`rotate(45 ${p.x} ${p.y})`}
+            />
+            <text class="nd-label" x={p.x + 11} y={p.y + 4}>
+              {p.code}
+            </text>
+          </g>
+        ))
+      }
+    </g>
+  </svg>
+
+  <figcaption class="nd-readout" data-nd-readout>
+    <span class="ph">悬停任一航路点</span>
+  </figcaption>
+</figure>

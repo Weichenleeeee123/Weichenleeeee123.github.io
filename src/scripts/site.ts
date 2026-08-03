@@ -150,9 +150,76 @@ function initSheen() {
   sheet.addEventListener('pointerleave', () => sheet.classList.remove('lit'));
 }
 
+/* ---------- 导航图 ↔ 作品列表 双向联动 ---------- */
+function initChartMap() {
+  const nd = document.querySelector<HTMLElement>('[data-nd]');
+  if (!nd) return;
+
+  const readout = nd.querySelector<HTMLElement>('[data-nd-readout]');
+  const needle = document.querySelector<SVGGElement>('.needle');
+  const marks = [...nd.querySelectorAll<SVGGElement>('[data-nd-pt]')];
+  const rows = [...document.querySelectorAll<HTMLElement>('[data-wpt]')];
+  const meta = rows.map((r) => ({
+    name: r.querySelector('h3')?.firstElementChild?.textContent?.trim() ?? '',
+    brg: 0,
+  }));
+
+  /* 方位从图上的位置反算，省得再传一份数据下来 */
+  marks.forEach((m, i) => {
+    const c = m.querySelector('circle')!;
+    const x = Number(c.getAttribute('cx')) - 200;
+    const y = Number(c.getAttribute('cy')) - 200;
+    meta[i].brg = Math.round((((Math.atan2(y, x) * 180) / Math.PI + 90) + 360) % 360);
+  });
+
+  let locked = false;
+
+  const focus = (i: number | null) => {
+    marks.forEach((m, k) => m.classList.toggle('hot', k === i));
+    rows.forEach((r, k) => r.classList.toggle('hot', k === i));
+
+    if (i === null) {
+      if (readout) readout.innerHTML = '<span class="ph">悬停任一航路点</span>';
+      return;
+    }
+    const { name, brg } = meta[i];
+    if (readout) {
+      readout.innerHTML = `<span>WPT ${String(i + 1).padStart(2, '0')} <b>${name}</b></span><span>BRG ${String(
+        brg
+      ).padStart(3, '0')}°</span>`;
+    }
+    if (needle && !locked) needle.style.transform = `rotate(${brg}deg)`;
+  };
+
+  marks.forEach((m, i) => {
+    m.addEventListener('pointerenter', () => focus(i));
+    m.addEventListener('focus', () => focus(i));
+    m.addEventListener('pointerleave', () => focus(null));
+    m.addEventListener('blur', () => focus(null));
+    const go = () => {
+      locked = true;
+      rows[i].scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' });
+      setTimeout(() => (locked = false), 900);
+    };
+    m.addEventListener('click', go);
+    m.addEventListener('keydown', (e) => {
+      if ((e as KeyboardEvent).key === 'Enter' || (e as KeyboardEvent).key === ' ') {
+        e.preventDefault();
+        go();
+      }
+    });
+  });
+
+  rows.forEach((r, i) => {
+    r.addEventListener('pointerenter', () => focus(i));
+    r.addEventListener('pointerleave', () => focus(null));
+  });
+}
+
 initTheme();
 initClock();
 initRoute();
 initNeedle();
 initReveal();
 initSheen();
+initChartMap();

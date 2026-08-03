@@ -3,6 +3,7 @@ import Base from '../layouts/Base.astro';
 import { getCollection } from 'astro:content';
 import { projects } from '../data/projects';
 import { links, site } from '../data/site';
+import ChartMap from '../components/ChartMap.astro';
 
 const posts = (await getCollection('posts', ({ data }) => !data.draft)).sort(
   (a, b) => b.data.date.valueOf() - a.data.date.valueOf()
@@ -38,10 +39,13 @@ const status = [
     </div>
 
     <div class="tb-main">
-      <h1 data-reveal>围城<span class="en">Weichen Li</span></h1>
-      <p class="tagline" data-reveal style="--delay:90ms">
-        18 岁，做 AI 产品。能定义产品，也能自己把它写完。
-      </p>
+      <div class="tb-copy">
+        <h1>围城<span class="en">Weichen Li</span></h1>
+        <p class="tagline" data-reveal style="--delay:420ms">
+          18 岁，做 AI 产品。能定义产品，也能自己把它写完。
+        </p>
+      </div>
+      <ChartMap />
     </div>
 
     <div class="tb-data">
@@ -89,7 +93,7 @@ const status = [
         <span class="route-progress" aria-hidden="true" />
         {
           projects.map((p, i) => (
-            <li class={`wpt${p.active ? ' active' : ''}`}>
+            <li class={`wpt${p.active ? ' active' : ''}`} id={`wpt-${i}`} data-wpt={i}>
               <span class="pt" />
               <div class="card" data-reveal>
                 <span class="idx">WPT {String(i + 1).padStart(2, '0')}</span>
