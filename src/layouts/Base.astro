@@ -1,0 +1,94 @@
+---
+import '../styles/global.css';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import { site } from '../data/site';
+
+interface Props {
+  title?: string;
+  description?: string;
+  /** 纸质航图模式（长文阅读） */
+  paper?: boolean;
+}
+
+const { title, description = site.description, paper = false } = Astro.props;
+const pageTitle = title ? `${title} — ${site.handle} ${site.name}` : site.title;
+const canonical = new URL(Astro.url.pathname, Astro.site).href;
+---
+
+<!doctype html>
+<html lang="zh-CN" class={paper ? 'paper' : ''}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="alternate" type="application/rss+xml" title={`${site.handle} · LOG`} href="/rss.xml" />
+    <meta name="theme-color" content={paper ? '#f3f1ea' : '#0a0e12'} />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta name="twitter:card" content="summary" />
+
+    {/* 有 JS 才启用入场动效；没有 JS 时内容必须直接可见 */}
+    <script is:inline>
+      document.documentElement.classList.add('js');
+    </script>
+
+    <link rel="preload" href="/fonts/jetbrains-mono.woff2" as="font" type="font/woff2" crossorigin />
+    <link
+      rel="preload"
+      href="/fonts/barlow-condensed-600.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+  </head>
+  <body>
+    <div class="gridfield" aria-hidden="true"></div>
+    <svg class="rings" viewBox="0 0 400 400" aria-hidden="true">
+      <g fill="none" stroke="var(--rule)" stroke-width="1">
+        <circle cx="200" cy="200" r="80"></circle>
+        <circle cx="200" cy="200" r="130"></circle>
+        <circle cx="200" cy="200" r="180" stroke-dasharray="2 6"></circle>
+      </g>
+      <g stroke="var(--rule)" stroke-width="1">
+        <line x1="200" y1="12" x2="200" y2="30"></line>
+        <line x1="200" y1="370" x2="200" y2="388"></line>
+        <line x1="12" y1="200" x2="30" y2="200"></line>
+        <line x1="370" y1="200" x2="388" y2="200"></line>
+      </g>
+    </svg>
+
+    <a class="skip" href="#main">跳到正文</a>
+    <Header />
+    <main id="main">
+      <slot />
+    </main>
+    <Footer />
+
+    <style>
+      .skip {
+        position: absolute;
+        left: -9999px;
+        top: 0;
+        z-index: 100;
+        background: var(--route);
+        color: #fff;
+        padding: 0.6rem 1rem;
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+      }
+      .skip:focus {
+        left: 0;
+      }
+      main {
+        min-height: 60vh;
+      }
+    </style>
+  </body>
+</html>

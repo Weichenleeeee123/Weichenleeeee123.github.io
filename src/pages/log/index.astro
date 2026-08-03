@@ -1,0 +1,131 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getCollection } from 'astro:content';
+
+const posts = (await getCollection('posts', ({ data }) => !data.draft)).sort(
+  (a, b) => b.data.date.valueOf() - a.data.date.valueOf()
+);
+
+const fmt = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+---
+
+<Base
+  title="LOG"
+  description="围城的飞行记录：把做过的东西、翻过的车、想明白的事写下来。"
+>
+  <div class="wrap page">
+    <header class="hd">
+      <h1 class="cond">LOG</h1>
+      <p class="lede">
+        飞行记录。写做完的东西、翻过的车、和想明白的事。<br />
+        不追更新频率——没有真东西的时候我不写。
+      </p>
+      <p class="mono cnt">
+        {String(posts.length).padStart(2, '0')} ENTRIES · <a class="link" href="/rss.xml">RSS</a>
+      </p>
+    </header>
+
+    <ul class="list">
+      {
+        posts.map((p) => (
+          <li>
+            <a href={`/log/${p.id}`}>
+              <span class="mono date">{fmt(p.data.date)}</span>
+              <span class="body">
+                <span class="t">{p.data.title}</span>
+                <span class="s">{p.data.summary}</span>
+                <span class="tags">
+                  {p.data.tags.map((t) => (
+                    <span class="mono tag">{t}</span>
+                  ))}
+                </span>
+              </span>
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</Base>
+
+<style>
+  .page {
+    padding-top: clamp(2rem, 6vw, 3.5rem);
+  }
+  .hd {
+    padding-bottom: clamp(1.6rem, 4vw, 2.4rem);
+    border-bottom: 1px solid var(--rule);
+  }
+  h1 {
+    margin: 0;
+    font-size: clamp(2.6rem, 9vw, 5rem);
+  }
+  .lede {
+    margin: 1.2rem 0 0;
+    max-width: 38em;
+    color: var(--fg-dim);
+  }
+  .cnt {
+    margin: 1.4rem 0 0;
+    font-size: 0.62rem;
+    color: var(--fg-faint);
+  }
+  .list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .list a {
+    display: grid;
+    grid-template-columns: 7.5rem minmax(0, 1fr);
+    gap: 1.5rem;
+    padding: 1.5rem 0;
+    border-bottom: 1px solid var(--rule);
+    transition: border-color 0.2s;
+  }
+  .list a:hover {
+    border-color: var(--route);
+  }
+  .date {
+    font-size: 0.62rem;
+    color: var(--fg-faint);
+    padding-top: 0.4rem;
+  }
+  .body {
+    display: grid;
+    gap: 0.4rem;
+  }
+  .t {
+    font-size: 1.22rem;
+    color: var(--fg);
+    transition: color 0.2s;
+  }
+  .list a:hover .t {
+    color: var(--route);
+  }
+  .s {
+    font-size: 0.88rem;
+    color: var(--fg-dim);
+  }
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.8rem;
+    margin-top: 0.25rem;
+  }
+  .tag {
+    font-size: 0.55rem;
+    color: var(--fg-faint);
+    text-transform: none;
+  }
+  @media (max-width: 640px) {
+    .list a {
+      grid-template-columns: 1fr;
+      gap: 0.5rem;
+    }
+    .date {
+      padding-top: 0;
+    }
+  }
+</style>

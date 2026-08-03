@@ -1,0 +1,112 @@
+---
+import Base from '../layouts/Base.astro';
+import Hud from '../components/Hud.astro';
+import Route from '../components/Route.astro';
+import { getCollection } from 'astro:content';
+
+const work = await getCollection('work');
+const posts = (await getCollection('posts', ({ data }) => !data.draft))
+  .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf())
+  .slice(0, 3);
+
+const fmt = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+---
+
+<Base>
+  <Hud waypoints={work.length} />
+  <Route />
+
+  <section class="sec wrap">
+    <div class="sechead">
+      <h2 class="cond">LOG</h2>
+      <span class="rule" aria-hidden="true"></span>
+      <a class="mono more" href="/log">全部 →</a>
+    </div>
+
+    <ul class="posts">
+      {
+        posts.map((p) => (
+          <li>
+            <a href={`/log/${p.id}`}>
+              <span class="mono date">{fmt(p.data.date)}</span>
+              <span class="t">{p.data.title}</span>
+              <span class="s">{p.data.summary}</span>
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+</Base>
+
+<style>
+  .sec {
+    padding-top: clamp(3rem, 8vw, 5.5rem);
+  }
+  .sechead {
+    display: flex;
+    align-items: center;
+    gap: 1.1rem;
+    margin-bottom: clamp(1rem, 3vw, 1.8rem);
+  }
+  .sechead h2 {
+    margin: 0;
+    font-size: clamp(1.1rem, 2.6vw, 1.5rem);
+    color: var(--fg-dim);
+  }
+  .rule {
+    flex: 1;
+    height: 1px;
+    background: var(--rule);
+  }
+  .more {
+    font-size: 0.62rem;
+    color: var(--fg-dim);
+  }
+  .more:hover {
+    color: var(--route);
+  }
+  .posts {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .posts a {
+    display: grid;
+    grid-template-columns: 7.5rem minmax(0, 1fr);
+    gap: 0.2rem 1.5rem;
+    padding: 1.15rem 0;
+    border-bottom: 1px solid var(--rule);
+    transition: border-color 0.2s;
+  }
+  .posts a:hover {
+    border-color: var(--route);
+  }
+  .date {
+    font-size: 0.62rem;
+    color: var(--fg-faint);
+    padding-top: 0.35rem;
+  }
+  .t {
+    font-size: 1.06rem;
+    color: var(--fg);
+    transition: color 0.2s;
+  }
+  .posts a:hover .t {
+    color: var(--route);
+  }
+  .s {
+    grid-column: 2;
+    font-size: 0.86rem;
+    color: var(--fg-dim);
+  }
+  @media (max-width: 640px) {
+    .posts a {
+      grid-template-columns: 1fr;
+    }
+    .s {
+      grid-column: 1;
+    }
+  }
+</style>

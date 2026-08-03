@@ -1,0 +1,99 @@
+---
+import { site, links } from '../data/site';
+const year = new Date().getFullYear();
+---
+
+<footer class="ftr">
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <p class="mono lbl">CONTACT</p>
+        <ul class="list">
+          {
+            links.map((l) => (
+              <li>
+                <span class="k">{l.label}</span>
+                <a class="link" href={l.href} rel="me noopener" target="_blank">
+                  {l.value}
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+      <div class="tail">
+        <p class="mono lbl">END OF ROUTE</p>
+        <p class="sig">
+          {site.handle} · {site.name}
+        </p>
+        <p class="mono fine">
+          © {year} · {site.route.from}→{site.route.to} · BUILT WITH ASTRO
+        </p>
+        <p class="mono fine">
+          <a class="link" href="/rss.xml">RSS</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<style>
+  .ftr {
+    margin-top: clamp(4rem, 10vw, 8rem);
+    border-top: 1px solid var(--rule);
+    padding-block: clamp(2.5rem, 6vw, 4rem);
+  }
+  .cols {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2.5rem;
+    align-items: start;
+  }
+  .lbl {
+    margin: 0 0 1rem;
+    color: var(--fg-faint);
+  }
+  .list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.55rem;
+  }
+  .list li {
+    display: flex;
+    align-items: baseline;
+    gap: 0.9rem;
+  }
+  .k {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.14em;
+    color: var(--fg-faint);
+    min-width: 4.6rem;
+  }
+  .tail {
+    text-align: right;
+  }
+  .sig {
+    font-family: var(--font-cond);
+    font-size: 1.4rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    margin: 0 0 0.4rem;
+    color: var(--fg);
+  }
+  .fine {
+    margin: 0.2rem 0 0;
+    font-size: 0.6rem;
+    color: var(--fg-faint);
+  }
+  @media (max-width: 640px) {
+    .cols {
+      grid-template-columns: 1fr;
+    }
+    .tail {
+      text-align: left;
+    }
+  }
+</style>

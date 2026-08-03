@@ -1,0 +1,195 @@
+---
+import { getCollection } from 'astro:content';
+import WaypointCard from './WaypointCard.astro';
+import WaypointRow from './WaypointRow.astro';
+
+const all = (await getCollection('work')).sort((a, b) => a.data.wpt - b.data.wpt);
+const primary = all.filter((e) => e.data.tier === 'primary');
+const secondary = all.filter((e) => e.data.tier === 'secondary');
+---
+
+<section id="work" class="sec">
+  <div class="wrap">
+    <div class="sechead">
+      <h2 class="cond">WORK</h2>
+      <span class="rule" aria-hidden="true"></span>
+      <span class="mono cnt">{String(all.length).padStart(2, '0')} WAYPOINTS</span>
+    </div>
+
+    <div class="rt" data-route>
+      <div class="track" aria-hidden="true"></div>
+      <div class="prog" aria-hidden="true"></div>
+      <div class="ac" aria-hidden="true">
+        <svg viewBox="0 0 24 24">
+          <path
+            d="M12 22 L4 4 L12 9 L20 4 Z"
+            fill="var(--route)"
+            stroke="var(--bg)"
+            stroke-width="1.2"
+            stroke-linejoin="round"></path>
+        </svg>
+      </div>
+
+      {primary.map((entry) => <WaypointCard entry={entry} />)}
+
+      <div class="divider">
+        <span class="mono">ALSO ON ROUTE</span>
+      </div>
+
+      {secondary.map((entry) => <WaypointRow entry={entry} />)}
+    </div>
+  </div>
+</section>
+
+<style>
+  .sec {
+    padding-top: clamp(2rem, 5vw, 3.5rem);
+  }
+  .sechead {
+    display: flex;
+    align-items: center;
+    gap: 1.1rem;
+    margin-bottom: clamp(1rem, 3vw, 2rem);
+  }
+  .sechead h2 {
+    margin: 0;
+    font-size: clamp(1.1rem, 2.6vw, 1.5rem);
+    color: var(--fg-dim);
+  }
+  .rule {
+    flex: 1;
+    height: 1px;
+    background: var(--rule);
+  }
+  .cnt {
+    font-size: 0.6rem;
+    color: var(--fg-faint);
+  }
+
+  .rt {
+    position: relative;
+  }
+  .track,
+  .prog {
+    position: absolute;
+    left: calc(var(--rail) / 2);
+    top: 0;
+    width: 1px;
+    transform: translateX(-50%);
+  }
+  .track {
+    bottom: 0;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--rule) 0 5px,
+      transparent 5px 11px
+    );
+  }
+  .prog {
+    width: 2px;
+    height: 0;
+    background: var(--route);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--route) 55%, transparent);
+  }
+  .ac {
+    position: absolute;
+    left: calc(var(--rail) / 2);
+    top: 0;
+    width: 19px;
+    height: 19px;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    transition: opacity 0.3s;
+    z-index: 2;
+  }
+  .ac svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .divider {
+    display: flex;
+    align-items: center;
+    margin: clamp(1.5rem, 4vw, 2.5rem) 0 0.5rem;
+    padding-left: var(--rail);
+  }
+  .divider span {
+    font-size: 0.58rem;
+    color: var(--fg-faint);
+    background: var(--bg);
+    padding-right: 0.8rem;
+  }
+
+  @media (max-width: 640px) {
+    .rt {
+      --rail: 30px;
+    }
+    .divider {
+      padding-left: 30px;
+    }
+  }
+</style>
+
+<script>
+  const rt = document.querySelector<HTMLElement>('[data-route]');
+  if (rt) {
+    const prog = rt.querySelector<HTMLElement>('.prog')!;
+    const ac = rt.querySelector<HTMLElement>('.ac')!;
+    const items = Array.from(rt.querySelectorAll<HTMLElement>('.item'));
+    const marks = Array.from(rt.querySelectorAll<HTMLElement>('.mk'));
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealAll = () => {
+      items.forEach((i) => i.classList.add('in'));
+      marks.forEach((m) => m.classList.add('lit'));
+    };
+
+    if (reduce || typeof IntersectionObserver === 'undefined') {
+      revealAll();
+      prog.style.height = '100%';
+    } else {
+      /* 兜底：万一观察器没触发，也不能让作品区一直空着 */
+      window.setTimeout(() => {
+        if (!items.some((i) => i.classList.contains('in'))) revealAll();
+      }, 2500);
+
+      const io = new IntersectionObserver(
+        (entries) => {
+          for (const e of entries) {
+            if (e.isIntersecting) {
+              e.target.classList.add('in');
+              io.unobserve(e.target);
+            }
+          }
+        },
+        { rootMargin: '0px 0px -10% 0px', threshold: 0.12 }
+      );
+      items.forEach((i) => io.observe(i));
+
+      let ticking = false;
+      const update = () => {
+        ticking = false;
+        const r = rt.getBoundingClientRect();
+        const anchor = window.innerHeight * 0.55;
+        const y = Math.min(Math.max(anchor - r.top, 0), r.height);
+        prog.style.height = `${y}px`;
+        ac.style.top = `${y}px`;
+        ac.style.opacity = r.top < anchor && r.bottom > anchor ? '1' : '0';
+        for (const m of marks) {
+          const mr = m.getBoundingClientRect();
+          m.classList.toggle('lit', mr.top + 10 <= anchor);
+        }
+      };
+      const onScroll = () => {
+        if (!ticking) {
+          ticking = true;
+          requestAnimationFrame(update);
+        }
+      };
+      window.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('resize', onScroll);
+      update();
+    }
+  }
+</script>
