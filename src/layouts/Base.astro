@@ -1,16 +1,14 @@
 ---
 import '../styles/global.css';
 import { site } from '../data/site';
-import Rings from '../components/Rings.astro';
+import Sheet from '../components/Sheet.astro';
 
 interface Props {
   title?: string;
   description?: string;
-  /** 文章页把距离环去掉，别跟正文抢注意力 */
-  rings?: boolean;
 }
 
-const { title, description = site.description, rings = true } = Astro.props;
+const { title, description = site.description } = Astro.props;
 const pageTitle = title ? `${title} · ${site.title}` : site.title;
 const canonical = new URL(Astro.url.pathname, Astro.site ?? site.url).href;
 ---
@@ -24,7 +22,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? site.url).href;
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <meta name="theme-color" content="#f5f2ea" />
+    <meta name="theme-color" content="#d9d3c1" />
 
     <meta property="og:type" content="website" />
     <meta property="og:title" content={pageTitle} />
@@ -37,15 +35,15 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? site.url).href;
     <link rel="alternate" type="application/rss+xml" title={site.title} href="/rss.xml" />
   </head>
   <body>
-    <div class="shell">
-      {rings && <Rings />}
+    <main class="sheet">
+      <Sheet />
       <slot />
       <footer class="foot">
-        <span>© {new Date().getFullYear()} 李伟宸</span>
+        <span>© {new Date().getFullYear()} 李伟宸 · 围城</span>
         <span>
           <a href="/rss.xml">RSS</a> · <a href="https://github.com/Weichenleeeee123">GitHub</a>
         </span>
       </footer>
-    </div>
+    </main>
   </body>
 </html>

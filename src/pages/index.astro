@@ -11,39 +11,45 @@ const posts = (await getCollection('posts', ({ data }) => !data.draft)).sort(
 const fmt = (d: Date) =>
   `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
 
-/* 航图/气象报文式的时间戳：日 时 分 Z，随每次构建更新 */
+/* 航图表头那种生效日期 + 报文时间戳，随每次构建更新 */
 const now = new Date();
 const p2 = (n: number) => String(n).padStart(2, '0');
 const stamp = `${p2(now.getUTCDate())}${p2(now.getUTCHours())}${p2(now.getUTCMinutes())}Z`;
+const eff = now
+  .toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+  .toUpperCase();
+
+const status = [
+  { k: '在做', v: 'KinoLens，重写它的剪辑决策层' },
+  { k: '在找', v: 'AI 产品方向的远程实习', amber: true },
+  { k: '在学', v: '多智能体编排，以及怎么把话说清楚' },
+];
 ---
 
 <Base>
-  <header class="masthead">
-    <div class="callsign">
-      <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true">
-        <rect
-          x="3"
-          y="3"
-          width="10"
-          height="10"
-          transform="rotate(45 8 8)"
-          fill="none"
-          stroke="#b8225e"
-          stroke-width="1.6"></rect>
-      </svg>
+  <header class="titleblock">
+    <div class="tb-strip">
+      <span>个人主页 · PERSONAL CHART</span>
       <span>{site.callsign} · {stamp}</span>
     </div>
 
-    <h1>围城<span class="en">Weichen Li</span></h1>
-    <p class="tagline">18 岁，做 AI 产品。能定义产品，也能自己把它写完。</p>
-
-    <div class="status">
-      <div><span class="k">在做</span>KinoLens，重写它的剪辑决策层</div>
-      <div><span class="k">在找</span><span class="amber">AI 产品方向的远程实习</span></div>
-      <div><span class="k">在学</span>多智能体编排，以及怎么把话说清楚</div>
+    <div class="tb-main">
+      <h1>围城<span class="en">Weichen Li</span></h1>
+      <p class="tagline">18 岁，做 AI 产品。能定义产品，也能自己把它写完。</p>
     </div>
 
-    <ul class="links">
+    <div class="tb-data">
+      {
+        status.map((s) => (
+          <div class="cell">
+            <span class="k">{s.k}</span>
+            <span class={`v${s.amber ? ' amber' : ''}`}>{s.v}</span>
+          </div>
+        ))
+      }
+    </div>
+
+    <ul class="tb-links">
       {
         links.map((l) => (
           <li>
@@ -60,65 +66,76 @@ const stamp = `${p2(now.getUTCDate())}${p2(now.getUTCHours())}${p2(now.getUTCMin
     </ul>
   </header>
 
-  <section class="bio">
-    <div class="section-head"><h2>关于</h2></div>
-    <p>
-      我习惯一个人把全程跑完：定义问题、写代码、部署上线、上台把它讲明白。做过的东西里，有拿奖的，也有到现在还不行的——两种我都放在下面了。
-    </p>
-    <p>
-      玩了六年模拟飞行，写了六年日记。这个站用来放作品和一些复盘，写得不勤，但写的都是真做过的事。
-    </p>
+  <section class="block">
+    <h2>关于</h2>
+    <div class="body bio">
+      <p>
+        我习惯一个人把全程跑完：定义问题、写代码、部署上线、上台把它讲明白。做过的东西里，有拿奖的，也有到现在还不行的——两种我都放在下面了。
+      </p>
+      <p>玩了六年模拟飞行，写了六年日记。这个站用来放作品和一些复盘，写得不勤，但写的都是真做过的事。</p>
+    </div>
   </section>
 
-  <section>
-    <div class="section-head"><h2>作品</h2></div>
-    <ol class="route">
-      {
-        projects.map((p, i) => (
-          <li class={`wpt${p.active ? ' active' : ''}`}>
-            <span class="pt" />
-            <span class="idx">WPT {String(i + 1).padStart(2, '0')}</span>
-            <h3>
-              {p.href ? (
-                <a href={p.href} target="_blank" rel="noopener">
-                  {p.name}
-                </a>
-              ) : (
-                p.name
-              )}
-              <span class="sub"> — {p.sub}</span>
-            </h3>
-            <p>{p.desc}</p>
-            <div class="meta">
-              {p.tags.map((t) => (
-                <span class={`tag${t.kind ? ' ' + t.kind : ''}`}>{t.text}</span>
-              ))}
-              {p.hrefText && <span>{p.hrefText}</span>}
-            </div>
-          </li>
-        ))
-      }
-    </ol>
-  </section>
-
-  <section>
-    <div class="section-head"><h2>文章</h2></div>
-    {
-      posts.length === 0 ? (
-        <p class="empty">还没有。</p>
-      ) : (
-        <ul class="posts">
-          {posts.map((post) => (
-            <li>
-              <span class="d">{fmt(post.data.date)}</span>
-              <a class="t" href={`/log/${post.id}/`}>
-                {post.data.title}
-              </a>
-              <p class="s">{post.data.summary}</p>
+  <section class="block">
+    <h2>作品</h2>
+    <div class="body">
+      <ol class="route">
+        {
+          projects.map((p, i) => (
+            <li class={`wpt${p.active ? ' active' : ''}`}>
+              <span class="pt" />
+              <div class="card">
+                <span class="idx">WPT {String(i + 1).padStart(2, '0')}</span>
+                <h3>
+                  {p.href ? (
+                    <a href={p.href} target="_blank" rel="noopener">
+                      {p.name}
+                    </a>
+                  ) : (
+                    p.name
+                  )}
+                  <span class="sub"> — {p.sub}</span>
+                </h3>
+                <p>{p.desc}</p>
+                <div class="meta">
+                  {p.tags.map((t) => (
+                    <span class={`tag${t.kind ? ' ' + t.kind : ''}`}>{t.text}</span>
+                  ))}
+                  {p.hrefText && <span>{p.hrefText}</span>}
+                </div>
+              </div>
             </li>
-          ))}
-        </ul>
-      )
-    }
+          ))
+        }
+      </ol>
+    </div>
   </section>
+
+  <section class="block">
+    <h2>文章</h2>
+    <div class="body">
+      {
+        posts.length === 0 ? (
+          <p class="empty">还没有。</p>
+        ) : (
+          <ul class="posts">
+            {posts.map((post) => (
+              <li>
+                <span class="d">{fmt(post.data.date)}</span>
+                <a class="t" href={`/log/${post.id}/`}>
+                  {post.data.title}
+                </a>
+                <p class="s">{post.data.summary}</p>
+              </li>
+            ))}
+          </ul>
+        )
+      }
+    </div>
+  </section>
+
+  <div class="tb-strip" style="border-top:1px solid var(--rule); border-bottom:0; position:relative; z-index:1;">
+    <span>EFF {eff}</span>
+    <span>END OF CHART</span>
+  </div>
 </Base>

@@ -1,0 +1,51 @@
+---
+/* 纸面上的印刷底纹：航路、罗盘玫瑰、图廓角标。
+   纯装饰，全部躺在纸张内部，不会被视口切掉。 */
+const rose = Array.from({ length: 36 }, (_, i) => i * 10);
+---
+
+<div class="plate" aria-hidden="true">
+  {/* 图廓四角 */}
+  <span class="corner tl"></span>
+  <span class="corner tr"></span>
+  <span class="corner bl"></span>
+  <span class="corner br"></span>
+
+  {/* 罗盘玫瑰 */}
+  <svg class="rose" viewBox="0 0 320 320" focusable="false">
+    <g fill="none" stroke="currentColor" stroke-width="1">
+      <circle cx="160" cy="160" r="60"></circle>
+      <circle cx="160" cy="160" r="128"></circle>
+      <circle cx="160" cy="160" r="150" stroke-dasharray="2 6"></circle>
+    </g>
+    <g stroke="currentColor" stroke-width="1">
+      {
+        rose.map((deg) => {
+          const major = deg % 30 === 0;
+          const rad = ((deg - 90) * Math.PI) / 180;
+          const r1 = major ? 112 : 121;
+          return (
+            <line
+              x1={160 + r1 * Math.cos(rad)}
+              y1={160 + r1 * Math.sin(rad)}
+              x2={160 + 128 * Math.cos(rad)}
+              y2={160 + 128 * Math.sin(rad)}
+            />
+          );
+        })
+      }
+    </g>
+    <g stroke="currentColor" stroke-width="1">
+      <line x1="160" y1="10" x2="160" y2="32"></line>
+      <path d="M160 6 L165 20 L160 16 L155 20 Z" fill="currentColor" stroke="none"></path>
+    </g>
+  </svg>
+
+  {/* 两条航路 */}
+  <svg class="airways" viewBox="0 0 1000 1400" preserveAspectRatio="none" focusable="false">
+    <g fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="10 8">
+      <path d="M-40 250 L1040 690"></path>
+      <path d="M-40 1180 L1040 470"></path>
+    </g>
+  </svg>
+</div>

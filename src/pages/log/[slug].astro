@@ -15,10 +15,9 @@ const d = post.data.date;
 const dateText = `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
 ---
 
-<Base title={post.data.title} description={post.data.summary} rings={false}>
-  <a class="back" href="/">← 回首页</a>
-
+<Base title={post.data.title} description={post.data.summary}>
   <article class="article">
+    <a class="back" href="/">← 回首页</a>
     <header>
       <div class="dateline">
         <span>{dateText}</span>
