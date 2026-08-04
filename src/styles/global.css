@@ -109,9 +109,12 @@ body {
   background: var(--paper);
   border: 1px solid var(--rule-strong);
   box-shadow: var(--sheet-shadow);
-  overflow: hidden;
   transition: background-color 0.35s var(--ease), border-color 0.35s var(--ease),
     box-shadow 0.35s var(--ease);
+  /* 这里绝对不能加 overflow:hidden。overflow 非 visible 会让本元素变成滚动
+     容器，而 animation-timeline: view() 取最近的滚动容器祖先做参照系——
+     一旦加上，站内所有滚动驱动动画的时间轴会变成 inactive，动画直接不生效。
+     装饰层由 .plate 自己的 overflow:hidden 裁切。 */
 }
 
 /* 图廓：纸张内缩的一圈细线 */
@@ -265,7 +268,7 @@ a:hover {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.6rem clamp(1.25rem, 4vw, 3.25rem);
+  padding: 0.75rem clamp(1.5rem, 4.5vw, 4rem);
   border-bottom: 1px solid var(--rule);
   font-family: var(--mono);
   font-size: 0.6875rem;
@@ -275,9 +278,9 @@ a:hover {
 }
 
 .tb-main {
-  padding: clamp(2rem, 5vw, 3.5rem) clamp(1.25rem, 4vw, 3.25rem) clamp(1.75rem, 3vw, 2.5rem);
+  padding: clamp(3rem, 7vw, 5.5rem) clamp(1.5rem, 4.5vw, 4rem) clamp(2.5rem, 4vw, 3.5rem);
   display: grid;
-  gap: 2.5rem;
+  gap: 4rem;
   align-items: center;
 }
 @media (min-width: 1000px) {
@@ -439,7 +442,7 @@ a:hover {
   background: var(--paper-panel);
 }
 .tb-data .cell {
-  padding: 0.85rem clamp(1.25rem, 4vw, 3.25rem) 1rem;
+  padding: 1.5rem clamp(1.5rem, 4.5vw, 4rem) 1.7rem;
   border-left: 1px solid var(--rule);
 }
 .tb-data .cell:first-child {
@@ -485,7 +488,7 @@ a:hover {
   flex-wrap: wrap;
   gap: 0.4rem 1.5rem;
   margin: 0;
-  padding: 0.75rem clamp(1.25rem, 4vw, 3.25rem);
+  padding: 1.15rem clamp(1.5rem, 4.5vw, 4rem);
   border-top: 1px solid var(--rule);
   list-style: none;
   font-family: var(--mono);
@@ -500,9 +503,9 @@ a:hover {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: 8.5rem minmax(0, 1fr);
-  gap: 0 2.5rem;
-  padding: clamp(2.5rem, 5vw, 3.75rem) clamp(1.25rem, 4vw, 3.25rem);
+  grid-template-columns: 9.5rem minmax(0, 1fr);
+  gap: 0 4rem;
+  padding: clamp(4rem, 8vw, 7rem) clamp(1.5rem, 4.5vw, 4rem);
   border-bottom: 1px solid var(--rule);
 }
 .block:last-of-type {
@@ -557,7 +560,7 @@ a:hover {
    1px 间隙 + 底色 = 整块作品区是一张被细线分格的图表 */
 .block.wide {
   grid-template-columns: 1fr;
-  gap: 1.75rem 0;
+  gap: 2.75rem 0;
 }
 .block.wide > h2 {
   position: static;
@@ -623,34 +626,11 @@ a:hover {
   height: 100%;
   object-fit: cover;
   filter: saturate(0.88) contrast(1.03);
-  transform: scale(1.02);
-  transition: transform 0.8s var(--ease), filter 0.5s var(--ease);
+  transition: transform 0.55s var(--ease), filter 0.5s var(--ease);
 }
 .work:hover .shot-img,
 .work.hot .shot-img {
-  transform: scale(1.09);
   filter: saturate(1.02) contrast(1.05);
-}
-
-/* 滚动时截图在框内缓慢上移，产生纵深 */
-@supports (animation-timeline: view()) {
-  .js .shot-img {
-    animation: shotPan linear both;
-    animation-timeline: view();
-    animation-range: entry 0% exit 100%;
-  }
-  .js .work:hover .shot-img,
-  .js .work.hot .shot-img {
-    animation-play-state: paused;
-  }
-}
-@keyframes shotPan {
-  from {
-    transform: scale(1.12) translateY(-2.5%);
-  }
-  to {
-    transform: scale(1.12) translateY(2.5%);
-  }
 }
 
 /* 纸色罩：把截图压回航图的色温里，不然像贴上去的 */
@@ -821,7 +801,7 @@ a:hover {
 }
 
 .work-body {
-  padding: 1rem 1.15rem 1.25rem;
+  padding: 1.5rem 1.6rem 1.75rem;
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -1067,7 +1047,7 @@ a:hover {
   z-index: 1;
   border-top: 1px solid var(--rule-strong);
   background: var(--paper-panel);
-  padding: 0.85rem clamp(1.25rem, 4vw, 3.25rem);
+  padding: 1.15rem clamp(1.5rem, 4.5vw, 4rem);
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem 1.5rem;
@@ -1088,7 +1068,7 @@ a:hover {
 .article {
   position: relative;
   z-index: 1;
-  padding: clamp(2rem, 5vw, 3.25rem) clamp(1.25rem, 4vw, 3.25rem) clamp(2.5rem, 5vw, 4rem);
+  padding: clamp(3rem, 6vw, 5rem) clamp(1.5rem, 4.5vw, 4rem) clamp(4rem, 8vw, 6.5rem);
   max-width: 46rem;
   margin: 0 auto;
 }
@@ -1239,18 +1219,12 @@ a:hover {
 /* ---------- 进场：分层浮起 ----------
    只有在 JS 确认可用时才隐藏（.js 由 head 内联脚本添加）。
    没有 JS、或脚本挂了，内容一律照常显示，不会白屏。 */
-.js [data-reveal] {
-  opacity: 0;
-  transform: translateY(10px);
-}
+
 [data-reveal] {
   transition: opacity 0.6s var(--ease), transform 0.6s var(--ease);
   transition-delay: var(--delay, 0ms);
 }
-.js [data-reveal].in {
-  opacity: 1;
-  transform: none;
-}
+
 
 /* ---------- 开机自检：进场时序 ---------- */
 .js .nd-rings circle,
@@ -1329,94 +1303,52 @@ a:hover {
   }
 }
 
-/* ---------- 滚动驱动展开 ----------
-   支持 animation-timeline 的浏览器（Chrome/Edge 115+）用真·滚动进度驱动：
-   往回滚会收回去，进度跟滚动条一一对应。不支持的退回 IO 触发式。 */
-@supports (animation-timeline: view()) {
-  .js [data-reveal] {
-    opacity: 1;
-    transform: none;
-    transition: none;
-    animation: unfold linear both;
-    animation-timeline: view();
-    animation-range: entry 12% cover 32%;
-  }
-  .js .block > h2 {
-    animation: slideLabel linear both;
-    animation-timeline: view();
-    animation-range: entry 5% cover 25%;
-  }
-  .js .block > h2::after {
-    animation: drawRule linear both;
-    animation-timeline: view();
-    animation-range: entry 10% cover 30%;
-  }
-  .js .block .num {
-    animation: numRise linear both;
-    animation-timeline: view();
-    animation-range: entry 5% cover 30%;
-  }
+/* ---------- 滚动显现 ----------
+   进度由 JS 算好写进 --p（0=未显现，1=完全显现），CSS 只负责表达。
+   默认 --p:1，所以没有 JS、脚本出错、或 reduced-motion 时内容照常完整显示。
+   不用 animation-timeline: view()，因为它对祖先的 overflow 极其敏感，
+   任何一层 overflow 非 visible 都会让整条时间轴静默失效。 */
+[data-reveal] {
+  --p: 1;
+  opacity: calc(0.06 + 0.94 * var(--p));
+  transform: translate3d(0, calc((1 - var(--p)) * 42px), 0);
+  will-change: transform, opacity;
+}
+.work[data-reveal] {
+  clip-path: inset(0 0 calc((1 - var(--p)) * 100%) 0);
+}
+.block > h2 {
+  --p: 1;
+  opacity: var(--p);
+  transform: translate3d(calc((1 - var(--p)) * -18px), 0, 0);
+}
+.block > h2::after {
+  width: calc(1.75rem * var(--p));
+}
+.block .num {
+  opacity: calc(0.16 * var(--p));
+  transform: translate3d(0, calc((1 - var(--p)) * 22px), 0);
+}
+/* 截图在框内随滚动上移，--pan 从 -1 到 1 */
+.shot-img {
+  --pan: 0;
+  transform: scale(1.12) translate3d(0, calc(var(--pan) * 2.6%), 0);
+}
+.work:hover .shot-img,
+.work.hot .shot-img {
+  transform: scale(1.16) translate3d(0, calc(var(--pan) * 2.6%), 0);
 }
 
-/* 作品卡用遮罩擦开，比淡入有分量 */
-@supports (animation-timeline: view()) {
-  .js .work[data-reveal] {
-    animation: wipeCard linear both;
-    animation-timeline: view();
-    animation-range: entry 8% cover 30%;
-  }
-}
-@keyframes wipeCard {
-  from {
-    opacity: 0.15;
-    clip-path: inset(0 0 100% 0);
-    transform: translateY(34px);
-  }
-  to {
-    opacity: 1;
-    clip-path: inset(0 0 0 0);
-    transform: none;
-  }
-}
-
-@keyframes unfold {
-  from {
-    opacity: 0;
-    transform: translateY(26px) scale(0.985);
-    filter: blur(1.5px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-    filter: none;
-  }
-}
-@keyframes slideLabel {
-  from {
-    opacity: 0;
-    transform: translateX(-14px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-@keyframes drawRule {
-  from {
-    width: 0;
-  }
-  to {
-    width: 1.75rem;
-  }
-}
-@keyframes numRise {
-  from {
-    opacity: 0;
-    transform: translateY(18px);
-  }
-  to {
-    opacity: 0.16;
-    transform: none;
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal],
+  .block > h2,
+  .block .num,
+  .shot-img {
+    --p: 1 !important;
+    --pan: 0 !important;
+    opacity: 1 !important;
+    transform: none !important;
+    clip-path: none !important;
   }
 }
 
@@ -1491,7 +1423,7 @@ a:hover {
   background: color-mix(in srgb, var(--paper-panel) 60%, var(--paper));
 }
 .stats .s {
-  padding: 1.1rem clamp(1rem, 3vw, 1.75rem) 1.2rem;
+  padding: 1.9rem clamp(1.25rem, 3.5vw, 2.5rem) 2rem;
   border-left: 1px solid var(--rule);
 }
 .stats .s:first-child {

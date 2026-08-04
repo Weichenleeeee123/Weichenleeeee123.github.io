@@ -124,31 +124,61 @@ function initNeedle() {
 }
 
 /* ---------- 内容分层进场 ---------- */
+/* ---------- 滚动显现 ----------
+   自己算进度写进 --p，不用 animation-timeline: view()：那个东西一旦有任何
+   祖先 overflow 非 visible 就整条静默失效，且无法在不渲染的环境里验证。 */
 function initReveal() {
-  const items = [...document.querySelectorAll<HTMLElement>('[data-reveal]')];
-  if (!items.length) return;
+  const items = [
+    ...document.querySelectorAll<HTMLElement>('[data-reveal], .block > h2, .block .num'),
+  ];
+  const pans = [...document.querySelectorAll<HTMLElement>('.shot-img')];
+  if (!items.length && !pans.length) return;
 
-  const showAll = () => items.forEach((el) => el.classList.add('in'));
+  /* reduced-motion 时什么都不做：CSS 默认 --p:1，本来就是完整显示 */
+  if (reduced) return;
 
-  if (reduced || !('IntersectionObserver' in window)) {
-    showAll();
-    return;
+  const clamp01 = (n: number) => (n < 0 ? 0 : n > 1 ? 1 : n);
+
+  const update = () => {
+    const vh = innerHeight;
+    /* 元素顶边从视口 90% 处开始显现，到 58% 处完全显现 */
+    const from = vh * 0.9;
+    const to = vh * 0.58;
+
+    for (const el of items) {
+      const r = el.getBoundingClientRect();
+      const p = clamp01((from - r.top) / (from - to));
+      el.style.setProperty('--p', p.toFixed(3));
+    }
+
+    /* 视差：元素中心相对视口中心，映射到 -1 ~ 1 */
+    for (const el of pans) {
+      const r = el.getBoundingClientRect();
+      const center = r.top + r.height / 2;
+      const v = (center - vh / 2) / (vh / 2 + r.height / 2);
+      el.style.setProperty('--pan', Math.max(-1, Math.min(1, v)).toFixed(3));
+    }
+  };
+
+  /* 不走 rAF：rAF 在不渲染的标签页里根本不触发，直接算反而更可靠也够快 */
+  let pending = false;
+  const onScroll = () => {
+    if (pending) return;
+    pending = true;
+    setTimeout(() => {
+      pending = false;
+      update();
+    }, 16);
+  };
+
+  addEventListener('scroll', onScroll, { passive: true });
+  addEventListener('resize', update, { passive: true });
+  update();
+
+  /* 图片加载完尺寸会变，重算一次视差基准 */
+  for (const img of pans) {
+    if (!(img as HTMLImageElement).complete) img.addEventListener('load', update, { once: true });
   }
-
-  const io = new IntersectionObserver(
-    (entries, obs) => {
-      for (const e of entries) {
-        if (!e.isIntersecting) continue;
-        (e.target as HTMLElement).classList.add('in');
-        obs.unobserve(e.target);
-      }
-    },
-    { rootMargin: '0px 0px -12% 0px' }
-  );
-  items.forEach((el) => io.observe(el));
-
-  /* 兜底：2 秒后无论如何全部显示。宁可少一个动画，也不能留白页。 */
-  setTimeout(showAll, 2000);
 }
 
 /* ---------- 纸面上的一点光，跟着光标走 ---------- */
