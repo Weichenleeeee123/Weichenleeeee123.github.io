@@ -2,6 +2,7 @@
 import '../styles/global.css';
 import { site } from '../data/site';
 import Sheet from '../components/Sheet.astro';
+import { ClientRouter } from 'astro:transitions';
 
 interface Props {
   title?: string;
@@ -33,6 +34,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? site.url).href;
     <link rel="preload" as="font" type="font/woff2" href="/fonts/jetbrains-mono-var.woff2" crossorigin />
     <link rel="preload" as="font" type="font/woff2" href="/fonts/barlow-condensed-600.woff2" crossorigin />
     <link rel="alternate" type="application/rss+xml" title={site.title} href="/rss.xml" />
+    <ClientRouter />
 
     {/* 先于首次绘制定好日/夜，避免切换时闪一下 */}
     <script is:inline>

@@ -46,10 +46,11 @@ function initTopbar() {
 
 /* ---------- Zulu 时钟：航图报文用的世界时 ---------- */
 function initClock() {
-  const el = document.querySelector<HTMLElement>('[data-zulu]');
-  if (!el) return;
   const p2 = (n: number) => String(n).padStart(2, '0');
+  /* 每次都重新查元素：翻页后旧节点已经不在文档里了 */
   const tick = () => {
+    const el = document.querySelector<HTMLElement>('[data-zulu]');
+    if (!el) return;
     const d = new Date();
     el.textContent = `${p2(d.getUTCDate())}${p2(d.getUTCHours())}${p2(d.getUTCMinutes())}${p2(
       d.getUTCSeconds()
@@ -235,11 +236,67 @@ function initChartMap() {
   });
 }
 
-initTheme();
-initTopbar();
-initClock();
-initRoute();
-initNeedle();
-initReveal();
-initSheen();
-initChartMap();
+/* ---------- 数据带：数字滚上去 ---------- */
+function initCounters() {
+  const nums = [...document.querySelectorAll<HTMLElement>('[data-count]')];
+  if (!nums.length) return;
+  if (reduced || !('IntersectionObserver' in window)) return;
+
+  const run = (el: HTMLElement) => {
+    const target = Number(el.dataset.count);
+    const dur = 900;
+    const t0 = performance.now();
+    const step = (t: number) => {
+      const p = Math.min(1, (t - t0) / dur);
+      /* easeOutExpo，末尾几乎停住，像仪表定位 */
+      const e = p === 1 ? 1 : 1 - Math.pow(2, -10 * p);
+      el.textContent = String(Math.round(target * e));
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  };
+
+  const io = new IntersectionObserver(
+    (entries, obs) => {
+      for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        run(e.target as HTMLElement);
+        obs.unobserve(e.target);
+      }
+    },
+    { threshold: 0.6 }
+  );
+  nums.forEach((n) => {
+    n.textContent = '0';
+    io.observe(n);
+  });
+
+  /* 兜底：2.5 秒后仍停在 0 的直接补上真值，绝不让数字永远是 0 */
+  setTimeout(() => {
+    for (const n of nums) {
+      if (n.textContent === '0' && n.dataset.count !== '0') n.textContent = n.dataset.count!;
+    }
+  }, 2500);
+}
+
+/* 开了视图过渡后脚本不会随导航重新执行，所以每次 page-load 都重新接一遍。
+   定时器只起一次，避免翻页翻几次就有几个时钟在跑。 */
+let clockStarted = false;
+
+function boot() {
+  initTheme();
+  initTopbar();
+  initCounters();
+  if (!clockStarted) {
+    initClock();
+    clockStarted = true;
+  }
+  initRoute();
+  initNeedle();
+  initReveal();
+  initSheen();
+  initChartMap();
+}
+
+boot();
+document.addEventListener('astro:page-load', boot);

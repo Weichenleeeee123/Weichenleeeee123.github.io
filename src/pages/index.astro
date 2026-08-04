@@ -5,6 +5,7 @@ import { projects } from '../data/projects';
 import { links, site } from '../data/site';
 import ChartMap from '../components/ChartMap.astro';
 import Cover from '../components/Cover.astro';
+import { Image } from 'astro:assets';
 
 const posts = (await getCollection('posts', ({ data }) => !data.draft)).sort(
   (a, b) => b.data.date.valueOf() - a.data.date.valueOf()
@@ -70,7 +71,7 @@ const status = [
         ].map((s) => (
           <div class="s">
             <span class="n">
-              {s.n}
+              <span data-count={s.n}>{s.n}</span>
               {s.u && <em>{s.u}</em>}
             </span>
             <span class="l">{s.l}</span>
@@ -118,9 +119,27 @@ const status = [
               data-wpt={i}
               data-reveal
             >
-              <div class="work-cover">
-                <Cover brg={p.brg} dist={p.dist} code={p.code} active={p.active} big={p.span > 2} />
+              <div class={`work-cover${p.cover ? ' shot' : ''}${p.coverDark ? ' dark' : ''}`}>
+                {
+                  p.cover ? (
+                    <Image
+                      class="shot-img"
+                      src={p.cover}
+                      alt={`${p.name} 界面截图`}
+                      widths={[420, 760, 1140]}
+                      sizes="(max-width: 900px) 100vw, (max-width: 1200px) 50vw, 700px"
+                      format="webp"
+                      quality={72}
+                      loading={i < 2 ? 'eager' : 'lazy'}
+                    />
+                  ) : (
+                    <Cover brg={p.brg} dist={p.dist} code={p.code} active={p.active} big={false} />
+                  )
+                }
+                <span class="cover-scrim" aria-hidden="true" />
+                <span class="cover-grid" aria-hidden="true" />
                 <span class="work-idx">{String(i + 1).padStart(2, '0')}</span>
+                <span class="work-code">{p.code}</span>
               </div>
               <div class="work-body">
                 <h3>
