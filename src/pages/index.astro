@@ -59,6 +59,25 @@ const status = [
       }
     </div>
 
+    <div class="stats">
+      {
+        [
+          { n: '7', l: '个做完并交付的作品' },
+          { n: '2', l: '个全国级奖项' },
+          { n: '1', l: '个合并进微软主线的 PR' },
+          { n: '6', u: '年', l: '模拟飞行 · 写日记' },
+        ].map((s) => (
+          <div class="s">
+            <span class="n">
+              {s.n}
+              {s.u && <em>{s.u}</em>}
+            </span>
+            <span class="l">{s.l}</span>
+          </div>
+        ))
+      }
+    </div>
+
     <ul class="tb-links">
       {
         links.map((l) => (
@@ -77,7 +96,7 @@ const status = [
   </header>
 
   <section class="block" data-bearing="30">
-    <h2>关于</h2>
+    <h2><span class="num">01</span>关于</h2>
     <div class="body bio">
       <p>
         我习惯一个人把全程跑完：定义问题、写代码、部署上线、上台把它讲明白。做过的东西里，有拿奖的，也有到现在还不行的——两种我都放在下面了。
@@ -87,7 +106,7 @@ const status = [
   </section>
 
   <section class="block" data-bearing="135">
-    <h2>作品</h2>
+    <h2><span class="num">02</span>作品</h2>
     <div class="body">
       <ol class="route">
         <span class="route-progress" aria-hidden="true" />
@@ -123,7 +142,7 @@ const status = [
   </section>
 
   <section class="block" data-bearing="255">
-    <h2>文章</h2>
+    <h2><span class="num">03</span>文章</h2>
     <div class="body">
       {
         posts.length === 0 ? (

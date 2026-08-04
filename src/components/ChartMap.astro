@@ -72,14 +72,9 @@ const ticks = Array.from({ length: 12 }, (_, i) => i * 30);
             aria-label={`${p.name}，方位 ${p.brg} 度`}
           >
             <circle class="nd-hit" cx={p.x} cy={p.y} r="22"></circle>
-            <rect
-              class="nd-mark"
-              x={p.x - 5}
-              y={p.y - 5}
-              width="10"
-              height="10"
-              transform={`rotate(45 ${p.x} ${p.y})`}
-            />
+            {/* 旋转不写在属性上：CSS transform 会整个覆盖属性 transform，
+                两者并存会让悬停时几何体来回跳，导致 enter/leave 反复触发 */}
+            <rect class="nd-mark" x={p.x - 5} y={p.y - 5} width="10" height="10" />
             <text class="nd-label" x={p.x + 11} y={p.y + 4}>
               {p.code}
             </text>

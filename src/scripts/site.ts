@@ -6,11 +6,11 @@ const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 function initTheme() {
   const KEY = 'chart-mode';
   const root = document.documentElement;
-  const btn = document.querySelector<HTMLButtonElement>('[data-theme-toggle]');
+  const btns = [...document.querySelectorAll<HTMLButtonElement>('[data-theme-toggle]')];
 
   const apply = (mode: 'day' | 'night') => {
     root.dataset.mode = mode;
-    if (btn) {
+    for (const btn of btns) {
       btn.textContent = mode === 'day' ? 'DAY' : 'NIGHT';
       btn.setAttribute('aria-label', mode === 'day' ? '切换到夜间航图' : '切换到日间航图');
     }
@@ -22,11 +22,26 @@ function initTheme() {
   const saved = localStorage.getItem(KEY) as 'day' | 'night' | null;
   apply(saved ?? 'day');
 
-  btn?.addEventListener('click', () => {
-    const next = root.dataset.mode === 'night' ? 'day' : 'night';
-    localStorage.setItem(KEY, next);
-    apply(next);
-  });
+  for (const btn of btns) {
+    btn.addEventListener('click', () => {
+      const next = root.dataset.mode === 'night' ? 'day' : 'night';
+      localStorage.setItem(KEY, next);
+      apply(next);
+    });
+  }
+}
+
+/* ---------- 顶栏：滚过首屏才出现，显示当前区块 ---------- */
+function initTopbar() {
+  const bar = document.querySelector<HTMLElement>('[data-topbar]');
+  const head = document.querySelector<HTMLElement>('.titleblock');
+  if (!bar || !head) return;
+
+  const io = new IntersectionObserver(
+    ([e]) => bar.classList.toggle('show', !e.isIntersecting),
+    { threshold: 0, rootMargin: '-72px 0px 0px 0px' }
+  );
+  io.observe(head);
 }
 
 /* ---------- Zulu 时钟：航图报文用的世界时 ---------- */
@@ -96,6 +111,10 @@ function initNeedle() {
         needle.style.transform = `rotate(${bearing}deg)`;
         const readout = document.querySelector<HTMLElement>('[data-bearing-readout]');
         if (readout) readout.textContent = `HDG ${String(bearing).padStart(3, '0')}°`;
+
+        const label = (e.target as HTMLElement).querySelector('h2')?.lastChild?.textContent?.trim();
+        const where = document.querySelector<HTMLElement>('[data-topbar-where]');
+        if (where && label) where.textContent = label;
       }
     },
     { rootMargin: '-45% 0px -45% 0px' }
@@ -217,6 +236,7 @@ function initChartMap() {
 }
 
 initTheme();
+initTopbar();
 initClock();
 initRoute();
 initNeedle();
