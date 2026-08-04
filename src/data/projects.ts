@@ -13,6 +13,8 @@ export type Project = {
   /** 导航图上的方位（度）与距离（0–1），决定它画在哪 */
   brg: number;
   dist: number;
+  /** bento 网格里占几列（共 6 列） */
+  span: number;
   /** 图上的短标识 */
   code: string;
 };
@@ -20,6 +22,7 @@ export type Project = {
 export const projects: Project[] = [
   {
     name: 'AlphaBit Coach',
+    span: 4,
     brg: 25,
     dist: 0.74,
     code: 'ABC',
@@ -35,6 +38,7 @@ export const projects: Project[] = [
   },
   {
     name: '影剧师',
+    span: 2,
     brg: 68,
     dist: 0.46,
     code: 'YJS',
@@ -46,6 +50,7 @@ export const projects: Project[] = [
   },
   {
     name: 'KinoLens',
+    span: 3,
     brg: 118,
     dist: 0.82,
     code: 'KNL',
@@ -61,6 +66,7 @@ export const projects: Project[] = [
   },
   {
     name: 'Virtual ATC',
+    span: 3,
     brg: 170,
     dist: 0.56,
     code: 'VATC',
@@ -72,6 +78,7 @@ export const projects: Project[] = [
   },
   {
     name: '语文老师.skill',
+    span: 2,
     brg: 216,
     dist: 0.79,
     code: 'YWLS',
@@ -83,6 +90,7 @@ export const projects: Project[] = [
   },
   {
     name: 'Microsoft Terminal',
+    span: 2,
     brg: 268,
     dist: 0.43,
     code: 'MSFT',
@@ -94,6 +102,7 @@ export const projects: Project[] = [
   },
   {
     name: '清明上河图',
+    span: 2,
     brg: 313,
     dist: 0.71,
     code: 'QMSHT',

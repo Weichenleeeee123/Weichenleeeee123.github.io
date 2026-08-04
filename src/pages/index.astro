@@ -4,6 +4,7 @@ import { getCollection } from 'astro:content';
 import { projects } from '../data/projects';
 import { links, site } from '../data/site';
 import ChartMap from '../components/ChartMap.astro';
+import Cover from '../components/Cover.astro';
 
 const posts = (await getCollection('posts', ({ data }) => !data.draft)).sort(
   (a, b) => b.data.date.valueOf() - a.data.date.valueOf()
@@ -105,17 +106,23 @@ const status = [
     </div>
   </section>
 
-  <section class="block" data-bearing="135">
+  <section class="block wide" data-bearing="135">
     <h2><span class="num">02</span>作品</h2>
     <div class="body">
-      <ol class="route">
-        <span class="route-progress" aria-hidden="true" />
+      <ol class="works">
         {
           projects.map((p, i) => (
-            <li class={`wpt${p.active ? ' active' : ''}`} id={`wpt-${i}`} data-wpt={i}>
-              <span class="pt" />
-              <div class="card" data-reveal>
-                <span class="idx">WPT {String(i + 1).padStart(2, '0')}</span>
+            <li
+              class={`work s${p.span}${p.active ? ' active' : ''}`}
+              id={`wpt-${i}`}
+              data-wpt={i}
+              data-reveal
+            >
+              <div class="work-cover">
+                <Cover brg={p.brg} dist={p.dist} code={p.code} active={p.active} big={p.span > 2} />
+                <span class="work-idx">{String(i + 1).padStart(2, '0')}</span>
+              </div>
+              <div class="work-body">
                 <h3>
                   {p.href ? (
                     <a href={p.href} target="_blank" rel="noopener">
@@ -124,14 +131,13 @@ const status = [
                   ) : (
                     p.name
                   )}
-                  <span class="sub"> — {p.sub}</span>
                 </h3>
-                <p>{p.desc}</p>
+                <p class="work-sub">{p.sub}</p>
+                <p class="work-desc">{p.desc}</p>
                 <div class="meta">
                   {p.tags.map((t) => (
                     <span class={`tag${t.kind ? ' ' + t.kind : ''}`}>{t.text}</span>
                   ))}
-                  {p.hrefText && <span>{p.hrefText}</span>}
                 </div>
               </div>
             </li>

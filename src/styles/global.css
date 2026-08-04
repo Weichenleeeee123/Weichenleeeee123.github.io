@@ -408,17 +408,21 @@ a:hover {
 .tb-main h1 {
   margin: 0;
   font-weight: 700;
-  font-size: clamp(2.5rem, 8vw, 4.25rem);
-  line-height: 1.02;
-  letter-spacing: 0.01em;
+  /* 参考里最一致的一条：display 字号要敢跨视口 */
+  font-size: clamp(4rem, 11vw, 8.5rem);
+  line-height: 0.88;
+  letter-spacing: -0.01em;
 }
 .tb-main h1 .en {
-  display: inline-block;
+  display: block;
   font-family: var(--cond);
-  font-weight: 500;
-  color: var(--ink-3);
-  margin-left: 0.65rem;
-  letter-spacing: 0.03em;
+  font-weight: 600;
+  font-size: clamp(1.25rem, 2.6vw, 2.1rem);
+  line-height: 1;
+  color: var(--magenta);
+  margin: 0.5rem 0 0;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
 .tb-main .tagline {
   margin: 1.1rem 0 0;
@@ -549,7 +553,179 @@ a:hover {
   margin-bottom: 0;
 }
 
-/* ---------- 作品：航路点面板 ---------- */
+/* ---------- 作品：bento 网格 ----------
+   1px 间隙 + 底色 = 整块作品区是一张被细线分格的图表 */
+.block.wide {
+  grid-template-columns: 1fr;
+  gap: 1.75rem 0;
+}
+.block.wide > h2 {
+  position: static;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 1rem;
+}
+.block.wide > h2 .num {
+  order: 0;
+  font-size: 2.25rem;
+}
+.block.wide > h2::after {
+  display: none;
+}
+
+.works {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 1px;
+  background: var(--rule-strong);
+  border: 1px solid var(--rule-strong);
+}
+.work {
+  background: var(--paper);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  transition: background-color 0.25s var(--ease);
+}
+.work.s2 {
+  grid-column: span 2;
+}
+.work.s3 {
+  grid-column: span 3;
+}
+.work.s4 {
+  grid-column: span 4;
+}
+.work.active {
+  background: color-mix(in srgb, var(--magenta) 5%, var(--paper));
+}
+.work:hover,
+.work.hot {
+  background: color-mix(in srgb, var(--magenta) 8%, var(--paper));
+}
+
+.work-cover {
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--paper-panel) 65%, var(--paper));
+}
+.cover {
+  display: block;
+  width: 100%;
+  height: auto;
+  color: var(--rule-strong);
+}
+.cv-arcs,
+.cv-ticks {
+  stroke-width: 1;
+}
+.cv-track {
+  stroke: var(--magenta);
+  stroke-width: 7;
+  opacity: 0.13;
+  transition: opacity 0.3s var(--ease), stroke-width 0.3s var(--ease);
+}
+.cv-track-dash {
+  stroke: var(--magenta);
+  stroke-width: 1.2;
+  stroke-dasharray: 7 6;
+  opacity: 0.75;
+}
+.cv-node circle {
+  fill: var(--paper);
+  stroke: var(--magenta);
+  stroke-width: 2;
+}
+.cv-node.on circle {
+  fill: var(--magenta);
+}
+.cv-code {
+  font-family: var(--cond);
+  font-weight: 600;
+  font-size: 27px;
+  letter-spacing: 0.08em;
+  fill: var(--ink);
+  opacity: 0.8;
+}
+.cv-brg {
+  font-family: var(--mono);
+  font-size: 11px;
+  fill: var(--ink-3);
+}
+.work:hover .cv-track,
+.work.hot .cv-track {
+  opacity: 0.28;
+  stroke-width: 11;
+}
+
+.work-idx {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.85rem;
+  font-family: var(--cond);
+  font-weight: 600;
+  font-size: 3.25rem;
+  line-height: 1;
+  color: var(--ink);
+  opacity: 0.13;
+}
+
+.work-body {
+  padding: 1rem 1.15rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.work-body h3 {
+  margin: 0;
+  font-size: 1.1875rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.work-body h3 a {
+  border-bottom: 0;
+}
+.work-body h3 a:hover {
+  border-bottom: 1px solid var(--magenta);
+}
+.work-sub {
+  margin: 0.15rem 0 0.6rem;
+  font-size: 0.8125rem;
+  color: var(--magenta);
+  font-family: var(--mono);
+  letter-spacing: 0.02em;
+}
+.work-desc {
+  margin: 0 0 0.9rem;
+  color: var(--ink-2);
+  font-size: 0.9375rem;
+  line-height: 1.7;
+}
+.work .meta {
+  margin-top: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+}
+
+@media (max-width: 900px) {
+  .works {
+    grid-template-columns: 1fr;
+  }
+  .work.s2,
+  .work.s3,
+  .work.s4 {
+    grid-column: auto;
+  }
+}
+
+/* ---------- 旧的航路点列表（文章页等仍在用的公共件） ---------- */
 .route {
   list-style: none;
   margin: 0;
