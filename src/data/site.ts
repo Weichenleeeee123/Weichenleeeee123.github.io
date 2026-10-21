@@ -10,7 +10,7 @@ export const site = {
   callsign: '围城',
   title: '李伟宸 · 围城',
   description: '李伟宸（围城）的个人网站。做 AI 产品，从想法到上线一个人把全程跑完。',
-  url: 'https://weichenleeeee123.github.io',
+  url: 'https://weichen.li',
   /** 首页一句话，出自他自己的 Bonjour 主页 */
   motto: '从一个想法到真正上线，我喜欢一个人把全程跑完，但更想找到能一起跑的人。',
 };

@@ -3,7 +3,7 @@ import { defineConfig } from 'astro/config';
 import sitemap from '@astrojs/sitemap';
 
 export default defineConfig({
-  site: 'https://weichenleeeee123.github.io',
+  site: 'https://weichen.li',
   integrations: [sitemap()],
   // 旧站的文章已下线，老链接统一落回首页
   redirects: {

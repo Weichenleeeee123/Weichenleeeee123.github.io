@@ -1,8 +1,8 @@
-# weichenleeeee123.github.io
+# weichen.li
 
 李伟宸（围城）的个人网站：一段可以「飞」的夜航。冷舱开机 → 滚动起飞 → 机长执照 → 巡航飞过 10 个作品 → 备降场 → 飞行日志 → 落地，在无线电上调频联系。
 
-Astro 静态输出 + three.js，推到 `main` 由 GitHub Actions 部署到 GitHub Pages。
+Astro 静态输出 + three.js，推到 `main` 由 GitHub Actions 部署到 GitHub Pages，自定义域名 weichen.li（Dynadot 注册，`public/CNAME`）。旧地址 weichenleeeee123.github.io 会自动跳到新域名。
 
 ## 本地跑
 
