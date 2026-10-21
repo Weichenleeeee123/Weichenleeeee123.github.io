@@ -59,6 +59,16 @@ let prev = { ...cur };
 let lastLanding = 0;
 function triggers(tgt: Flight) {
   if (!flying) return;
+  if (jumping || settling) {
+    lastLanding = tgt.landing;
+    // 跳转后等仪表追上目标再报到达，免得中途掠过的高度也喊出来
+    if (settling && Math.abs(cur.alt - tgt.alt) < 150 && Math.abs(cur.speed - tgt.speed) < 8) {
+      settling = false;
+      prev = { ...cur };
+      if (jumpMsg) callout(jumpMsg, 'green');
+    }
+    return;
+  }
   const p = prev;
   if (cur.phase === 'takeoff' || cur.phase === 'climb' || cur.phase === 'ground') {
     if (up(p.n1, cur.n1, 85)) callout('THRUST SET', 'green', 'thrust set');
@@ -242,12 +252,72 @@ function showCard(i: number) {
   activeCard = i;
 }
 
+/* 程序跳转：滚动结束前不触发呼叫，结束后再报一句 */
+let jumping = false;
+let settling = false;
+let jumpTimer = 0;
+let jumpMsg = '';
+function flyTo(top: number, msg: string) {
+  jumping = true;
+  jumpMsg = msg;
+  const dist = Math.abs(top - scrollY);
+  // 远距离直接切过去：平滑滚过十几屏太慢，飞行状态本身会平滑过渡
+  scrollTo({ top, behavior: reduce || dist > innerHeight * 6 ? 'auto' : 'smooth' });
+  clearTimeout(jumpTimer);
+  jumpTimer = window.setTimeout(endJump, 1400);
+}
+function endJump() {
+  if (!jumping) return;
+  jumping = false;
+  settling = true;
+}
+addEventListener('scrollend', () => {
+  if (!jumping) return;
+  clearTimeout(jumpTimer);
+  jumpTimer = window.setTimeout(endJump, 150);
+});
+
 function goToWaypoint(i: number) {
   const el = legs.cruise;
   const top = el.offsetTop + ((i + 0.5) / N) * (el.offsetHeight - innerHeight);
-  scrollTo({ top, behavior: reduce ? 'auto' : 'smooth' });
-  callout(`DIR TO ${data.codes[i]}`, 'green');
+  flyTo(top, `DIR TO ${data.codes[i]}`);
 }
+
+const sectionTop = (id: string) => {
+  const el = document.getElementById(id)!;
+  switch (id) {
+    case 'hero':
+      return 0;
+    case 'works':
+      return el.offsetTop + (0.5 / N) * (el.offsetHeight - innerHeight);
+    case 'contact':
+      return el.offsetTop + 0.94 * (el.offsetHeight - innerHeight);
+    case 'captain':
+      return ($('.about-grid').getBoundingClientRect().top + scrollY) - innerHeight * 0.12;
+    default:
+      return el.offsetTop + innerHeight * 0.05;
+  }
+};
+const jumpNames: Record<string, string> = {
+  hero: 'RWY 24',
+  captain: 'CAPTAIN',
+  works: 'DIR TO TERMN',
+  alternates: 'ALTERNATES',
+  logbook: 'LOGBOOK',
+  contact: 'WELCOME',
+};
+function jumpTo(id: string) {
+  if (!flying) return;
+  flyTo(sectionTop(id), jumpNames[id] ?? '');
+}
+document.addEventListener('click', (e) => {
+  const t = (e.target as Element).closest<HTMLElement>('[data-jump], [data-jump-to]');
+  if (!t) return;
+  e.preventDefault();
+  sound.click(1100);
+  if (t.dataset.jump !== undefined) goToWaypoint(Number(t.dataset.jump));
+  else jumpTo(t.dataset.jumpTo!);
+});
 
 /* ═════════ FMC ═════════ */
 const fmc = $('[data-fmc]');
@@ -279,12 +349,21 @@ function fmcKey(k: string) {
 }
 $$('[data-key]').forEach((b) => b.addEventListener('click', () => fmcKey(b.dataset.key!)));
 legBtns.forEach((b) => b.addEventListener('click', () => goToWaypoint(Number(b.dataset.goto))));
+// 导航显示器上的航路点也能点
+$$<SVGGElement>('[data-nd-wpt]').forEach((g) => g.addEventListener('click', () => goToWaypoint(Number(g.dataset.ndWpt))));
 addEventListener('keydown', (e) => {
   if (!flying || e.metaKey || e.ctrlKey || e.altKey) return;
   const r = legs.cruise.getBoundingClientRect();
   const inCruise = r.top <= 1 && r.bottom >= innerHeight - 1;
   if (!inCruise) return;
-  if (/^[a-z]$/i.test(e.key)) fmcKey(e.key.toUpperCase());
+  if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+    e.preventDefault();
+    if (activeCard < N - 1) goToWaypoint(activeCard + 1);
+    else jumpTo('alternates');
+  } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+    e.preventDefault();
+    if (activeCard > 0) goToWaypoint(activeCard - 1);
+  } else if (/^[a-z]$/i.test(e.key)) fmcKey(e.key.toUpperCase());
   else if (e.key === 'Enter') fmcKey('EXEC');
   else if (e.key === 'Backspace') fmcKey('BACK');
   else if (e.key === 'Escape') fmcKey('CLR');
@@ -292,10 +371,13 @@ addEventListener('keydown', (e) => {
 
 /* ═════════ 光标、视角 ═════════ */
 const fpv = $('[data-fpv]');
+// 鼠标真动过之前不算位置，否则屏幕中央的字母会被「推开」
+let pointerSeen = false;
 const mouse = { x: innerWidth / 2, y: innerHeight / 2 };
 const fp = { x: mouse.x, y: mouse.y };
 const look = { x: 0, y: 0 };
 addEventListener('pointermove', (e) => {
+  if (e.pointerType === 'mouse') pointerSeen = true;
   mouse.x = e.clientX;
   mouse.y = e.clientY;
   const t = e.target as Element;
@@ -312,7 +394,7 @@ const landedStyle = document.createElement('style');
 landedStyle.textContent = '.hero-name .ch.landed{animation:none!important;opacity:1!important}';
 document.head.append(landedStyle);
 function repel() {
-  if (scrollY > innerHeight) return;
+  if (!pointerSeen || scrollY > innerHeight) return;
   for (const l of letters) {
     const r = l.getBoundingClientRect();
     const dx = r.left + r.width / 2 - mouse.x;
@@ -330,6 +412,36 @@ function repel() {
       l.style.removeProperty('--tr');
     }
   }
+}
+
+/* ═════════ 航程进度条 ═════════ */
+const routeIds = ['hero', 'captain', 'works', 'alternates', 'logbook', 'contact'];
+const routePts = $$('.route-pt');
+const routePlane = $('[data-route-plane]');
+const routeFill = $('[data-route-fill]');
+let routeTops: number[] = [];
+const measureRoute = () => {
+  routeTops = routeIds.map((id) => Math.max(0, sectionTop(id) - innerHeight * 0.3));
+  routeTops[0] = 0;
+};
+addEventListener('resize', measureRoute);
+addEventListener('load', measureRoute);
+measureRoute();
+let routeX = 0;
+function route() {
+  const y = scrollY;
+  let i = 0;
+  while (i < routeTops.length - 1 && y >= routeTops[i + 1]) i++;
+  const next = routeTops[i + 1] ?? routeTops[i] + 1;
+  const local = i < routeTops.length - 1 ? Math.min(1, Math.max(0, (y - routeTops[i]) / (next - routeTops[i]))) : 0;
+  const x = (i + local) / (routeIds.length - 1);
+  routeX += (x - routeX) * 0.2;
+  routePlane.style.setProperty('--x', routeX.toFixed(4));
+  routeFill.style.transform = `scaleX(${routeX.toFixed(4)})`;
+  routePts.forEach((b, k) => {
+    b.classList.toggle('passed', k < i || (k === i && local > 0));
+    b.classList.toggle('current', k === i);
+  });
 }
 
 /* ═════════ 主循环 ═════════ */
@@ -359,6 +471,7 @@ function tick(now: number) {
   showCard(cur.phase === 'cruise' && cur.cruise < 1 ? tgt.wpt : cur.cruise >= 1 ? N - 1 : 0);
   sound.update(cur.n1, cur.speed, 1);
   repel();
+  route();
 }
 function frame(now: number) {
   tick(now);
@@ -474,6 +587,18 @@ $('[data-skip]').addEventListener('click', () => {
   finish();
 });
 if (localStorage.getItem('booted')) $('[data-skip]').textContent = '快速开机 →';
+
+/* ═════════ 头像 ═════════ */
+const lock = $('[data-lock]');
+const bubbles = ['嘎？', '头好痛……', '嘎嘎！', '起飞了吗？', '我是机长'];
+let bubbleN = 0;
+lock.addEventListener('click', () => {
+  lock.classList.remove('shake');
+  void lock.offsetWidth;
+  lock.classList.add('shake');
+  $('[data-bubble]').textContent = bubbles[bubbleN++ % bubbles.length];
+  sound.click(600);
+});
 
 /* ═════════ 声音开关、重新开机 ═════════ */
 const soundBtn = $('[data-sound]');

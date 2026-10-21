@@ -1,6 +1,7 @@
 ---
 import { Image } from 'astro:assets';
 import Base from '../layouts/Base.astro';
+import avatar from '../assets/avatar.jpg';
 import { site, stats, projects, alternates, logbook, checklist, radio } from '../data/site';
 
 const nameLetters = site.nameEn.split('');
@@ -72,7 +73,10 @@ const nameLetters = site.nameEn.split('');
   </div>
 
   <header class="topbar">
-    <a class="callsign" href="#hero">WCL737 <span>· {site.callsign}</span></a>
+    <a class="callsign" href="#hero" data-jump-to="hero">
+      <Image src={avatar} alt="" width={64} height={64} class="cs-avatar" />
+      WCL737 <span>· {site.callsign}</span>
+    </a>
     <div class="fma" aria-label="飞行方式">
       <span data-fma="thr">N1</span><span data-fma="roll">HDG SEL</span><span data-fma="pitch">TO/GA</span>
     </div>
@@ -129,11 +133,34 @@ const nameLetters = site.nameEn.split('');
       <text x="120" y="144" text-anchor="middle" class="readout small" data-hdg>HDG 240</text>
     </svg>
 
+    <div class="center-col">
+    <nav class="route" aria-label="航程：点一下飞过去" data-route>
+      <span class="route-line"><i data-route-fill></i></span>
+      <span class="route-plane" data-route-plane aria-hidden="true">
+        <svg viewBox="-12 -12 24 24"><path d="M0 -10 L2 -3 L10 2 L10 4 L2 2 L1.5 7 L4 9 L4 10.5 L0 9.5 L-4 10.5 L-4 9 L-1.5 7 L-2 2 L-10 4 L-10 2 L-2 -3 Z" /></svg>
+      </span>
+      {
+        [
+          ['hero', 'RWY', '跑道'],
+          ['captain', 'CLB', '机长'],
+          ['works', 'CRZ', '作品'],
+          ['alternates', 'ALTN', '备降'],
+          ['logbook', 'LOG', '日志'],
+          ['contact', 'LDG', '联系'],
+        ].map(([id, code, cn]) => (
+          <button type="button" class="route-pt" data-jump-to={id}>
+            <b>{code}</b>
+            <span>{cn}</span>
+          </button>
+        ))
+      }
+    </nav>
     <div class="mcp" aria-hidden="true">
       <div><span>IAS</span><b data-mcp="spd">000</b></div>
       <div><span>HDG</span><b data-mcp="hdg">240</b></div>
       <div><span>ALT</span><b data-mcp="alt">00000</b></div>
       <div class="vsbox"><span>V/S</span><b data-mcp="vs">+0000</b></div>
+    </div>
     </div>
 
     <div class="engines" aria-hidden="true">
@@ -159,6 +186,15 @@ const nameLetters = site.nameEn.split('');
   <main>
     <!-- ═════════ 跑道 · 我是谁 ═════════ -->
     <section class="leg hero" id="hero">
+      <button type="button" class="lock" data-lock aria-label="机长头像，点一下">
+        <Image src={avatar} alt="围城的头像：一只可达鸭" width={240} height={240} class="lock-img" loading="eager" />
+        <svg class="lock-ring" viewBox="-60 -60 120 120" aria-hidden="true">
+          <circle class="lock-dash" r="54"></circle>
+          <path class="lock-br" d="M-44 -30 V-44 H-30 M30 -44 H44 V-30 M44 30 V44 H30 M-30 44 H-44 V30"></path>
+        </svg>
+        <span class="lock-tag" aria-hidden="true">TGT LOCK · CAPT</span>
+        <span class="lock-bubble" data-bubble aria-hidden="true">嘎？</span>
+      </button>
       <p class="hero-kicker">RWY 24 · ZSNJ · CLEARED FOR TAKEOFF</p>
       <h2 class="hero-name" data-repel aria-label={site.nameEn}>
         {nameLetters.map((c) => <span class:list={['ch', c === ' ' && 'sp']}>{c === ' ' ? ' ' : c}</span>)}
@@ -210,7 +246,7 @@ const nameLetters = site.nameEn.split('');
             <span>No. WCL-0737</span>
           </div>
           <div class="lic-body">
-            <div class="lic-photo">围城</div>
+            <div class="lic-photo"><Image src={avatar} alt="围城的头像" width={192} height={240} /></div>
             <dl>
               <dt>NAME</dt><dd>{site.name} / {site.nameEn}</dd>
               <dt>CALLSIGN</dt><dd>{site.callsign}</dd>
@@ -371,6 +407,27 @@ const nameLetters = site.nameEn.split('');
                     )}
                   </div>
                 </div>
+                <nav class="card-nav" aria-label="上一站 / 下一站">
+                  {i > 0 ? (
+                    <button type="button" data-jump={i - 1}>
+                      ← <span>上一站</span> {projects[i - 1].code}
+                    </button>
+                  ) : (
+                    <span />
+                  )}
+                  <span class="card-count">
+                    {String(i + 1).padStart(2, '0')} / {String(projects.length).padStart(2, '0')}
+                  </span>
+                  {i < projects.length - 1 ? (
+                    <button type="button" data-jump={i + 1}>
+                      {projects[i + 1].code} <span>下一站</span> →
+                    </button>
+                  ) : (
+                    <button type="button" data-jump-to="alternates">
+                      <span>继续飞</span> ALTN →
+                    </button>
+                  )}
+                </nav>
               </article>
             ))
           }

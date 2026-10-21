@@ -30,7 +30,8 @@
 html {
   -webkit-text-size-adjust: 100%;
   scroll-behavior: auto;
-  overflow-x: hidden;
+  /* 用 clip 不用 hidden：html 和 body 同时 hidden 会让 body 变成滚动容器，所有吸顶段落失效 */
+  overflow-x: clip;
 }
 
 body {
@@ -41,7 +42,7 @@ body {
   font-size: 16px;
   line-height: 1.7;
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 /* 开机前锁住滚动 */
@@ -238,6 +239,20 @@ html.hud-on .hud {
   color: var(--ink);
   text-decoration: none;
   font-weight: 700;
+}
+
+.callsign {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.cs-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 1.5px var(--green), 0 0 12px rgba(77, 255, 154, 0.5);
 }
 
 .callsign span {
@@ -457,8 +472,122 @@ body.slam main {
   fill: var(--green);
 }
 
-.mcp {
+.center-col {
   justify-self: center;
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  width: min(560px, 100%);
+}
+
+.route {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0 0.2rem;
+}
+
+.route-line {
+  position: absolute;
+  left: 1.6rem;
+  right: 1.6rem;
+  top: 7px;
+  height: 2px;
+  background: repeating-linear-gradient(90deg, #4a525d 0 6px, transparent 6px 10px);
+}
+
+.route-line i {
+  position: absolute;
+  inset: 0;
+  background: var(--magenta);
+  box-shadow: 0 0 8px var(--magenta);
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+}
+
+.route-plane {
+  --x: 0;
+  position: absolute;
+  top: -4px;
+  /* 0 和 1 分别对准第一个和最后一个航路点 */
+  left: calc(1.6rem + (100% - 3.2rem) * var(--x));
+  width: 22px;
+  height: 22px;
+  margin-left: -11px;
+  pointer-events: none;
+}
+
+.route-plane svg {
+  width: 100%;
+  height: 100%;
+  fill: #fff;
+  transform: rotate(90deg);
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.8));
+}
+
+.route-pt {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  gap: 0;
+  min-width: 2.8rem;
+  padding: 0;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font-family: var(--mono);
+  line-height: 1.15;
+}
+
+.route-pt::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  margin: 3px 0 4px;
+  transform: rotate(45deg);
+  border: 1.5px solid var(--cyan);
+  background: var(--bg);
+  transition: all 0.25s;
+}
+
+.route-pt b {
+  font-size: 0.62rem;
+  color: var(--dim);
+  letter-spacing: 0.1em;
+}
+
+.route-pt span {
+  font-family: var(--sans);
+  font-size: 0.62rem;
+  color: #6f7c88;
+}
+
+.route-pt.passed::before {
+  border-color: var(--magenta);
+  background: var(--magenta);
+}
+
+.route-pt.current b {
+  color: var(--magenta);
+}
+
+.route-pt.current span {
+  color: var(--ink);
+}
+
+.route-pt:hover b,
+.route-pt:focus-visible b {
+  color: var(--cyan);
+}
+
+.route-pt:hover::before {
+  transform: rotate(45deg) scale(1.5);
+  box-shadow: 0 0 10px var(--cyan);
+}
+
+.mcp {
   display: flex;
   gap: 0.4rem;
   padding: 0.4rem;
@@ -567,7 +696,13 @@ body.slam main {
 
 @media (max-width: 760px) {
   :root {
-    --glare-h: 64px;
+    --glare-h: 92px;
+  }
+  .center-col {
+    width: 100%;
+  }
+  .route-pt span {
+    display: none;
   }
   .glare {
     grid-template-columns: 1fr;
@@ -580,10 +715,18 @@ body.slam main {
   .mcp {
     width: 100%;
     justify-content: space-between;
+    padding: 0.2rem 0.3rem;
+  }
+  .mcp div {
+    font-size: 0.5rem;
+    flex-direction: row;
+    gap: 0.3rem;
   }
   .mcp b {
-    font-size: 0.9rem;
+    margin: 0;
+    font-size: 0.8rem;
     min-width: 0;
+    padding: 0.05rem 0.35rem;
   }
 }
 
@@ -642,12 +785,163 @@ html.js [data-reveal].in {
 /* ───────── 跑道 · 首屏 ───────── */
 .hero {
   min-height: 100svh;
+  gap: 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   text-align: center;
   padding: 6rem 1.5rem calc(var(--glare-h) + 2rem);
+}
+
+.lock {
+  position: relative;
+  width: clamp(84px, min(13vw, 14vh), 132px);
+  aspect-ratio: 1;
+  margin: 0 0 2.6rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.lock-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 3px rgba(77, 255, 154, 0.7), 0 0 40px rgba(77, 255, 154, 0.35);
+  transition: transform 0.4s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+.lock:hover .lock-img {
+  transform: scale(1.06) rotate(-4deg);
+}
+
+.lock-ring {
+  position: absolute;
+  inset: -34%;
+  width: 168%;
+  height: 168%;
+  overflow: visible;
+  fill: none;
+  stroke: var(--green);
+  stroke-width: 1.6;
+  pointer-events: none;
+  filter: drop-shadow(0 0 4px rgba(77, 255, 154, 0.8));
+}
+
+.lock-dash {
+  stroke-dasharray: 3 7;
+  opacity: 0.6;
+  transform-origin: 0 0;
+  animation: spinRing 14s linear infinite;
+}
+
+@keyframes spinRing {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.lock-br {
+  stroke-width: 2.4;
+  transform-origin: 0 0;
+}
+
+/* 开机后：四个角从远处收拢，「锁定」 */
+html.flying .lock-br {
+  animation: lockOn 1.1s 0.3s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+}
+
+@keyframes lockOn {
+  0% {
+    transform: scale(2.4) rotate(45deg);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  70% {
+    transform: scale(0.92) rotate(0deg);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.lock-tag {
+  position: absolute;
+  left: 50%;
+  bottom: -2.1rem;
+  translate: -50% 0;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.2em;
+  color: var(--green);
+  opacity: 0;
+}
+
+html.flying .lock-tag {
+  animation: tagBlink 0.5s 1.3s steps(2) 3 both;
+}
+
+@keyframes tagBlink {
+  0% {
+    opacity: 0;
+  }
+  50%,
+  100% {
+    opacity: 1;
+  }
+}
+
+.lock-bubble {
+  position: absolute;
+  left: 92%;
+  top: -6%;
+  padding: 0.25rem 0.7rem;
+  border-radius: 12px 12px 12px 2px;
+  background: #fff;
+  color: #222;
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+  opacity: 0;
+  transform: scale(0.4);
+  transform-origin: 0 100%;
+  pointer-events: none;
+}
+
+.lock.shake .lock-img {
+  animation: duckShake 0.6s ease-in-out;
+}
+
+.lock.shake .lock-bubble {
+  animation: bubble 1.6s cubic-bezier(0.2, 1.6, 0.4, 1) forwards;
+}
+
+@keyframes duckShake {
+  20% { transform: rotate(-12deg) scale(1.05); }
+  40% { transform: rotate(10deg) scale(1.05); }
+  60% { transform: rotate(-7deg); }
+  80% { transform: rotate(4deg); }
+}
+
+@keyframes bubble {
+  12% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  80% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.9) translateY(-6px);
+  }
 }
 
 .hero-kicker {
@@ -662,7 +956,7 @@ html.js [data-reveal].in {
   margin: 0;
   font-family: var(--sans);
   font-weight: 700;
-  font-size: clamp(3.2rem, 13.5vw, 14rem);
+  font-size: clamp(3.2rem, min(13.5vw, 19vh), 14rem);
   line-height: 0.9;
   letter-spacing: -0.02em;
   white-space: nowrap;
@@ -730,6 +1024,7 @@ html.flying .hero-name .ch {
   text-shadow: 0 2px 12px #000, 0 0 2px #000;
   max-width: 34em;
   margin: 1rem auto 0;
+  text-wrap: balance;
   color: var(--dim);
   font-size: clamp(0.95rem, 1.6vw, 1.1rem);
 }
@@ -737,7 +1032,7 @@ html.flying .hero-name .ch {
 .stats {
   list-style: none;
   padding: 0;
-  margin: 2.6rem 0 0;
+  margin: clamp(1.2rem, 4vh, 2.6rem) 0 0;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -764,7 +1059,10 @@ html.flying .hero-name .ch {
 }
 
 .throttle-hint {
-  margin-top: 3rem;
+  /* 钉在右下角，首屏多高都看得见 */
+  position: absolute;
+  right: max(5vw, 1.2rem);
+  bottom: calc(var(--glare-h) + 3vh);
   display: flex;
   align-items: center;
   gap: 0.8rem;
@@ -801,7 +1099,7 @@ html.flying .hero-name .ch {
 
 /* ───────── 起飞 ───────── */
 .takeoff {
-  height: 380vh;
+  height: 320vh;
 }
 
 .quadrant {
@@ -884,7 +1182,7 @@ html.flying .hero-name .ch {
 
 /* ───────── 机长 ───────── */
 .about {
-  padding: 40vh 1.5rem 40vh;
+  padding: 26vh 1.5rem 22vh;
 }
 
 .about-grid {
@@ -962,16 +1260,16 @@ html.js .license[data-reveal].in {
 .lic-photo {
   width: 96px;
   height: 120px;
-  display: grid;
-  place-content: center;
-  writing-mode: vertical-rl;
-  font-size: 2.2rem;
-  font-weight: 700;
-  line-height: 1.1;
-  background: linear-gradient(160deg, #ff4df2, #7b2cff 50%, #45e4ff);
-  color: #fff;
   border-radius: 8px;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.15);
+}
+
+.lic-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .lic-body dl {
@@ -1015,12 +1313,8 @@ html.js .license[data-reveal].in {
     grid-template-columns: 1fr;
   }
   .lic-photo {
-    writing-mode: horizontal-tb;
-    width: 100%;
-    height: 64px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    width: 80px;
+    height: 100px;
   }
 }
 
@@ -1422,6 +1716,11 @@ html.js .license[data-reveal].in {
     visibility 0s 0.7s;
 }
 
+.card {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(69, 228, 255, 0.4) transparent;
+}
+
 .card.on {
   visibility: visible;
   opacity: 1;
@@ -1641,8 +1940,27 @@ html.js .license[data-reveal].in {
 }
 
 @media (max-width: 760px) {
-  .card-text dl {
+  .card-text dl,
+  .card-img,
+  .card-mono {
     display: none !important;
+  }
+  .card-body {
+    margin-top: 0.9rem;
+  }
+  .card-text p {
+    font-size: 0.92rem;
+    line-height: 1.75;
+  }
+  .card-title {
+    font-size: 1.8rem;
+  }
+  .nd {
+    max-height: 17vh !important;
+    max-width: 17vh !important;
+  }
+  .throttle-hint {
+    display: none;
   }
 }
 
@@ -1670,6 +1988,50 @@ html.js .license[data-reveal].in {
   flex-wrap: wrap;
   gap: 0.6rem;
   margin-top: 1rem !important;
+}
+
+.card-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-top: 1.3rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid rgba(69, 228, 255, 0.2);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+}
+
+.card-nav button {
+  background: none;
+  border: 1px solid #3a414b;
+  border-radius: 4px;
+  padding: 0.3rem 0.75rem;
+  color: var(--magenta);
+  cursor: pointer;
+  font-family: var(--mono);
+  letter-spacing: 0.06em;
+  transition: all 0.2s;
+}
+
+.card-nav button span {
+  font-family: var(--sans);
+  color: var(--dim);
+  font-size: 0.75rem;
+}
+
+.card-nav button:hover {
+  border-color: var(--magenta);
+  box-shadow: 0 0 14px rgba(255, 77, 242, 0.35);
+}
+
+.card-count {
+  color: var(--dim);
+  letter-spacing: 0.15em;
+}
+
+.nd-wpt {
+  cursor: pointer;
 }
 
 .card-links a {
@@ -1710,13 +2072,14 @@ html.js .license[data-reveal].in {
   }
   .card-img img,
   .card-mono {
-    aspect-ratio: 21 / 9;
+    aspect-ratio: auto;
+    height: clamp(80px, 16vh, 180px);
   }
 }
 
 /* ───────── 备降场 ───────── */
 .alternates {
-  padding: 30vh 1.5rem 20vh;
+  padding: 16vh 1.5rem 14vh;
 }
 
 .alt-grid {
@@ -1789,7 +2152,7 @@ html.js .license[data-reveal].in {
 
 /* ───────── 飞行日志 ───────── */
 .logbook {
-  padding: 20vh 1.5rem 40vh;
+  padding: 12vh 1.5rem 26vh;
 }
 
 .log-paper {
@@ -1918,7 +2281,7 @@ html.js .log-row[data-reveal] {
 
 /* ───────── 进近落地 · 联系 ───────── */
 .landing {
-  height: 420vh;
+  height: 360vh;
 }
 
 .landing-stage {

@@ -22,6 +22,7 @@ const pointVert = /* glsl */ `
   uniform float uPixel;
   uniform float uTime;
   uniform float uStrobe;
+  uniform float uMax;
   varying vec3 vColor;
   varying float vAlpha;
   void main() {
@@ -36,7 +37,7 @@ const pointVert = /* glsl */ `
     float rabbit = uStrobe > 0.5 ? step(fract(uTime * 1.6 - seed), 0.07) * 3.0 : 1.0;
     vAlpha = flick * rabbit;
     vColor = color;
-    gl_PointSize = clamp(size * uPixel * (260.0 / -mv.z), 1.0, 64.0);
+    gl_PointSize = clamp(size * uPixel * (260.0 / -mv.z), 1.0, uMax);
   }
 `;
 
@@ -60,8 +61,9 @@ const cloudFrag = /* glsl */ `
   void main() {
     vec2 c = gl_PointCoord - 0.5;
     float d = length(c);
-    float a = smoothstep(0.5, 0.05, d);
-    gl_FragColor = vec4(vColor, a * a * uOpacity);
+    // 高斯一样的软边，叠在一起才像一团雾，而不是一颗颗点
+    float a = exp(-d * d * 14.0);
+    gl_FragColor = vec4(vColor, a * uOpacity);
   }
 `;
 
@@ -71,7 +73,7 @@ function makeLayer(
   positions: number[],
   colors: number[],
   sizes: number[],
-  opts: { tile?: boolean; len?: number; strobe?: boolean; frag?: string; additive?: boolean } = {},
+  opts: { tile?: boolean; len?: number; strobe?: boolean; frag?: string; additive?: boolean; max?: number } = {},
 ): Layer {
   const g = new THREE.BufferGeometry();
   const n = sizes.length;
@@ -93,6 +95,7 @@ function makeLayer(
       uTime: { value: 0 },
       uStrobe: { value: opts.strobe ? 1 : 0 },
       uOpacity: { value: 1 },
+      uMax: { value: opts.max ?? 64 },
     },
     transparent: true,
     depthWrite: false,
@@ -200,8 +203,9 @@ export class World {
     const g = cv.getContext('2d')!;
     const grd = g.createRadialGradient(128, 128, 0, 128, 128, 128);
     grd.addColorStop(0, 'rgba(255,250,235,1)');
-    grd.addColorStop(0.12, 'rgba(255,248,230,1)');
-    grd.addColorStop(0.16, 'rgba(200,210,255,0.35)');
+    grd.addColorStop(0.1, 'rgba(255,248,230,1)');
+    grd.addColorStop(0.12, 'rgba(210,220,255,0.28)');
+    grd.addColorStop(0.35, 'rgba(160,180,255,0.06)');
     grd.addColorStop(1, 'rgba(120,140,255,0)');
     g.fillStyle = grd;
     g.fillRect(0, 0, 256, 256);
@@ -297,16 +301,16 @@ export class World {
 
   private makeClouds(): Layer {
     const pos: number[] = [], col: number[] = [], size: number[] = [];
-    const n = this.lite ? 700 : 1600;
+    const n = this.lite ? 450 : 1000;
     for (let i = 0; i < n; i++) {
       // 云层底 6000ft，顶 9000ft
       const y = (6000 + Math.random() * 3000) * ALT_K;
       pos.push((Math.random() - 0.5) * 2400, y, -Math.random() * 3000);
       const shade = 0.42 + Math.random() * 0.22;
       col.push(shade * 0.85, shade * 0.9, shade * 1.05);
-      size.push(70 + Math.random() * 120);
+      size.push(160 + Math.random() * 220);
     }
-    return makeLayer(pos, col, size, { tile: true, len: 3000, frag: cloudFrag, additive: false });
+    return makeLayer(pos, col, size, { tile: true, len: 3000, frag: cloudFrag, additive: false, max: this.lite ? 256 : 640 });
   }
 
   resize() {
@@ -355,8 +359,8 @@ export class World {
     // 云：在云层里时相机周围全是云粒子，自然起雾
     // 从地面看云底要很淡，不然像一层噪点；穿云时最浓；云上面看是一片铺开的云海
     const inCloud = 1 - Math.min(1, Math.abs(f.alt - 7500) / 2600);
-    const below = f.alt < 6000 ? THREE.MathUtils.smoothstep(f.alt, 2500, 6000) * 0.12 : 0.14;
-    set(this.clouds, this.distance * 0.9, alt, below + inCloud * 0.22);
+    const below = f.alt < 6000 ? THREE.MathUtils.smoothstep(f.alt, 2500, 6000) * 0.08 : 0.1;
+    set(this.clouds, this.distance * 0.9, alt, below + inCloud * 0.16);
 
     set(this.stars, 0, 0, 0.25 + high * 0.75);
     (this.moon.material as THREE.SpriteMaterial).opacity = 0.75 + high * 0.25;
