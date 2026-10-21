@@ -5,11 +5,10 @@ import sitemap from '@astrojs/sitemap';
 export default defineConfig({
   site: 'https://weichenleeeee123.github.io',
   integrations: [sitemap()],
-  markdown: {
-    shikiConfig: {
-      theme: 'github-dark-dimmed',
-      wrap: true,
-    },
+  // 旧站的文章已下线，老链接统一落回首页
+  redirects: {
+    '/log/adventurex-2026': '/',
+    '/log/kinolens-200-lines': '/',
   },
   build: {
     inlineStylesheets: 'auto',

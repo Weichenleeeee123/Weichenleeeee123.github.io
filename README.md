@@ -1,6 +1,8 @@
 # weichenleeeee123.github.io
 
-个人站。Astro + 静态输出，GitHub Actions 自动部署到 GitHub Pages。
+李伟宸（围城）的个人网站：一段可以「飞」的夜航。冷舱开机 → 滚动起飞 → 机长执照 → 巡航飞过 10 个作品 → 备降场 → 飞行日志 → 落地，在无线电上调频联系。
+
+Astro 静态输出 + three.js，推到 `main` 由 GitHub Actions 部署到 GitHub Pages。
 
 ## 本地跑
 
@@ -10,44 +12,31 @@ npm run dev      # http://localhost:4321
 npm run build    # 输出到 dist/
 ```
 
-## 写一篇新文章
+## 改内容
 
-在 `src/content/posts/` 下新建一个 `.md` 文件，文件名就是 URL（`/log/<文件名>/`）：
+所有文字都在 `src/data/site.ts`：
 
-```markdown
----
-title: 标题
-date: 2026-08-10
-summary: 一句话摘要，会出现在首页列表和 RSS 里
-tags: [KinoLens, 复盘]
-draft: false
----
+- `projects`：作品，顺序就是航路顺序。`code` 是五字母航路点代号，访客在 FMC 上敲它就能跳过去；`image` 可选，没有就显示代号大字
+- `alternates`：备降场（小项目）
+- `logbook`：飞行日志（经历），`stamp` 会盖一个红章
+- `checklist`：起飞前检查单（技能）
+- `radio`：无线电频率（联系方式），没有 `href` 的只显示不跳转
+- `stats`：首屏数据带
 
-正文……
-```
+截图放 `src/assets/covers/`，在 `site.ts` 顶部 import。
 
-`draft: true` 的文章不会出现在首页、RSS 和构建产物里。
+## 代码在哪
 
-## 改作品列表
+| 文件 | 管什么 |
+| --- | --- |
+| `src/scripts/flight.ts` | 滚动位置 → 速度/高度/姿态/航向。每段页面的进度怎么换算成飞行状态都在这 |
+| `src/scripts/world.ts` | 挡风玻璃外的 3D 世界：天空、星星、月亮、城市灯、跑道灯、进近频闪、云层 |
+| `src/scripts/audio.ts` | 发动机声、风噪、无线电沙沙声都是现场合成的；呼叫用浏览器语音合成 |
+| `src/scripts/main.ts` | 主循环、仪表、HUD、呼叫、FMC、导航显示器、开机流程、无线电 |
+| `src/styles/global.css` | 全部样式 |
 
-编辑 `src/data/projects.ts`。每个项目：
-
-- `name` / `sub`：名字和一句话定位
-- `desc`：两三句说清它是什么、现在什么状态
-- `href` / `hrefText`：外链（没有就不写，标题自动变成纯文本）
-- `tags`：`kind` 可选 `award`（琥珀）/ `wip`（洋红）/ `done`（绿）
-- `active: true`：航路点变实心，表示正在做
-
-顺序就是数组顺序，`WPT 01…` 编号自动生成。
-
-## 改联系方式 / 状态
-
-`src/data/site.ts` 管联系方式；首页 STATUS 面板的三行在 `src/pages/index.astro` 里。
-
-## 部署
-
-推到 `main` 自动构建部署。首次需要在仓库 **Settings → Pages → Build and deployment → Source** 选 **GitHub Actions**。
+调试：页面在后台时浏览器不跑动画帧，可以在控制台用 `__flight.step(100)` 手动推进 100 帧，`__flight.cur` 看当前飞行状态。
 
 ## 设计约定
 
-纸质航图：米白纸底 `#f5f2ea`、蓝灰细线、洋红航路 `#b8225e`。字体自托管在 `public/fonts/`（Barlow Condensed + JetBrains Mono，仅 latin 子集，共约 75 KB），中文走系统字体，不加载任何第三方资源。全站零 JavaScript。
+夜航驾驶舱配色：洋红 = 航路/当前目标，青 = 数据，绿 = 状态正常，琥珀 = 读数和告警。字体 B612（空客为驾驶舱屏幕设计的开源字体），中文走系统黑体。正文卡片一律深底浅字，动效再夸张也不压字。系统开了「减少动态效果」时，所有动画和过渡会关掉。

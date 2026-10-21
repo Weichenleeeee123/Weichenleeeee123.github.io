@@ -1,196 +1,472 @@
 ---
-import Base from '../layouts/Base.astro';
-import { getCollection } from 'astro:content';
-import { projects } from '../data/projects';
-import { links, site } from '../data/site';
-import ChartMap from '../components/ChartMap.astro';
-import Cover from '../components/Cover.astro';
 import { Image } from 'astro:assets';
+import Base from '../layouts/Base.astro';
+import { site, stats, projects, alternates, logbook, checklist, radio } from '../data/site';
 
-const posts = (await getCollection('posts', ({ data }) => !data.draft)).sort(
-  (a, b) => b.data.date.valueOf() - a.data.date.valueOf()
-);
-
-const fmt = (d: Date) =>
-  `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
-
-/* 航图表头那种生效日期 + 报文时间戳，随每次构建更新 */
-const now = new Date();
-const p2 = (n: number) => String(n).padStart(2, '0');
-const stamp = `${p2(now.getUTCDate())}${p2(now.getUTCHours())}${p2(now.getUTCMinutes())}Z`;
-const eff = now
-  .toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-  .toUpperCase();
-
-const status = [
-  { k: '在做', v: 'KinoLens，重写它的剪辑决策层' },
-  { k: '在找', v: 'AI 产品方向的远程实习', amber: true },
-  { k: '在学', v: '多智能体编排，以及怎么把话说清楚' },
-];
+const nameLetters = site.nameEn.split('');
 ---
 
 <Base>
-  <header class="titleblock">
-    <div class="tb-strip">
-      <span>个人主页 · PERSONAL CHART</span>
-      <span class="right">
-        <span data-bearing-readout>HDG 000°</span>
-        <span>{site.callsign} · <span data-zulu>{stamp}</span></span>
-        <button class="mode" type="button" data-theme-toggle>DAY</button>
-      </span>
-    </div>
+  <!-- ═════════ 冷舱开机 ═════════ -->
+  <div class="boot" data-boot role="dialog" aria-label="开机">
+    <div class="boot-half top"></div>
+    <div class="boot-half bottom"></div>
+    <div class="boot-panel">
+      <p class="boot-tag">B737-800 · OVERHEAD PANEL</p>
+      <h1 class="boot-title" data-boot-title>COLD &amp; DARK</h1>
+      <p class="boot-sub" data-boot-sub>这是一架关着的 737。先把电打开。</p>
 
-    <div class="tb-main">
-      <div class="tb-copy">
-        <h1>围城<span class="en">Weichen Li</span></h1>
-        <p class="tagline" data-reveal style="--delay:420ms">
-          18 岁，做 AI 产品。能定义产品，也能自己把它写完。
-        </p>
+      <div class="boot-row">
+        <div class="switch-unit" data-step="battery">
+          <button class="guard" type="button" data-guard aria-label="掀开 BATTERY 保护盖"></button>
+          <button class="toggle" type="button" data-battery aria-label="BATTERY 开关" disabled><span></span></button>
+          <span class="switch-label">BATTERY</span>
+          <span class="switch-hint" data-battery-hint>① 点红盖掀开</span>
+        </div>
+
+        <div class="annun" aria-hidden="true">
+          {['FUEL', 'ELEC', 'APU', 'OVHT', 'ANTI-ICE', 'HYD', 'DOORS', 'AIR COND', 'FLT CONT', 'IRS', 'ENG', 'OVERHEAD'].map((t, i) => (
+            <span class:list={['lamp', i % 3 === 0 ? 'red' : 'amber']}>{t}</span>
+          ))}
+        </div>
+
+        <div class="start-unit">
+          <button class="start-knob" type="button" data-start disabled aria-label="ENGINE START">
+            <span class="knob-ptr"></span>
+          </button>
+          <span class="switch-label">ENGINE START</span>
+          <span class="switch-hint" data-start-hint>OFF</span>
+        </div>
       </div>
-      <ChartMap />
-    </div>
 
-    <div class="tb-data">
+      <pre class="eicas" data-eicas aria-live="polite"></pre>
+      <div class="boot-n1" data-boot-n1 aria-hidden="true"><span>N1</span><b>0.0</b></div>
+    </div>
+    <button class="boot-skip" type="button" data-skip>跳过开机 →</button>
+  </div>
+
+  <!-- ═════════ 固定层：世界、HUD、窗框、仪表 ═════════ -->
+  <canvas class="world" data-world aria-hidden="true"></canvas>
+  <div class="vignette" aria-hidden="true"></div>
+
+  <svg class="hud" data-hud viewBox="-500 -300 1000 600" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <g data-ladder>
+      <line class="horizon" x1="-900" y1="0" x2="900" y2="0"></line>
       {
-        status.map((s, i) => (
-          <div class="cell" data-reveal style={`--delay:${140 + i * 70}ms`}>
-            <span class="k">{s.k}</span>
-            <span class={`v${s.amber ? ' amber' : ''}`}>{s.v}</span>
-          </div>
+        [-20, -15, -10, -5, 5, 10, 15, 20].map((p) => (
+          <g transform={`translate(0 ${-p * 14})`}>
+            <path d={p > 0 ? 'M-90 0 H-30 M30 0 H90' : 'M-90 0 H-76 M-64 0 H-50 M-38 0 H-30 M30 0 H38 M50 0 H64 M76 0 H90'} />
+            <text x="-104" y="4" text-anchor="end">{Math.abs(p)}</text>
+            <text x="104" y="4">{Math.abs(p)}</text>
+          </g>
         ))
       }
-    </div>
+    </g>
+    <g class="boresight"><path d="M-14 0 H-5 M5 0 H14 M0 -5 V-12"></path></g>
+  </svg>
 
-    <div class="stats">
-      {
-        [
-          { n: '7', l: '个做完并交付的作品' },
-          { n: '2', l: '个全国级奖项' },
-          { n: '1', l: '个合并进微软主线的 PR' },
-          { n: '6', u: '年', l: '模拟飞行 · 写日记' },
-        ].map((s) => (
-          <div class="s">
-            <span class="n">
-              <span data-count={s.n}>{s.n}</span>
-              {s.u && <em>{s.u}</em>}
-            </span>
-            <span class="l">{s.l}</span>
-          </div>
-        ))
-      }
-    </div>
+  <div class="frame" aria-hidden="true"><span class="pillar l"></span><span class="pillar r"></span></div>
 
-    <ul class="tb-links">
-      {
-        links.map((l) => (
-          <li>
-            {l.href ? (
-              <a href={l.href} rel={l.href.startsWith('http') ? 'me noopener' : undefined}>
-                {l.text}
-              </a>
-            ) : (
-              <span class="plain">{l.text}</span>
-            )}
-          </li>
-        ))
-      }
-    </ul>
+  <div class="fpv" data-fpv aria-hidden="true">
+    <svg viewBox="-30 -20 60 40"><circle r="7"></circle><path d="M-22 0 H-7 M7 0 H22 M0 -7 V-15"></path></svg>
+  </div>
+
+  <header class="topbar">
+    <a class="callsign" href="#hero">WCL737 <span>· {site.callsign}</span></a>
+    <div class="fma" aria-label="飞行方式">
+      <span data-fma="thr">N1</span><span data-fma="roll">HDG SEL</span><span data-fma="pitch">TO/GA</span>
+    </div>
+    <div class="top-actions">
+      <button type="button" class="pill" data-sound aria-pressed="true">SOUND ON</button>
+    </div>
   </header>
 
-  <section class="block" data-bearing="30">
-    <h2><span class="num">01</span>关于</h2>
-    <div class="body bio">
-      <p>
-        我习惯一个人把全程跑完：定义问题、写代码、部署上线、上台把它讲明白。做过的东西里，有拿奖的，也有到现在还不行的——两种我都放在下面了。
-      </p>
-      <p>玩了六年模拟飞行，写了六年日记。这个站用来放作品和一些复盘，写得不勤，但写的都是真做过的事。</p>
-    </div>
-  </section>
+  <div class="callout" data-callout aria-hidden="true"></div>
+  <div class="flash" data-flash aria-hidden="true"></div>
 
-  <section class="block wide" data-bearing="135">
-    <h2><span class="num">02</span>作品</h2>
-    <div class="body">
-      <ol class="works">
+  <!-- 遮光板：底部一条仪表 -->
+  <footer class="glare" aria-label="仪表">
+    <svg class="pfd" viewBox="0 0 240 150" aria-hidden="true">
+      <defs>
+        <clipPath id="att-clip"><rect x="58" y="14" width="124" height="112" rx="14"></rect></clipPath>
+        <clipPath id="tape-clip"><rect x="0" y="14" width="240" height="112"></rect></clipPath>
+      </defs>
+      <g clip-path="url(#att-clip)">
+        <g data-att>
+          <rect x="-100" y="-300" width="440" height="370" fill="#2a77d4"></rect>
+          <rect x="-100" y="70" width="440" height="370" fill="#8a5a2b"></rect>
+          <line x1="-100" y1="70" x2="340" y2="70" stroke="#fff" stroke-width="1.4"></line>
+          {[-20, -10, 10, 20].map((p) => <line x1={p % 20 ? 106 : 96} x2={p % 20 ? 134 : 144} y1={70 - p * 2.2} y2={70 - p * 2.2} stroke="#fff" stroke-width="1" />)}
+        </g>
+      </g>
+      <path d="M92 70 H110 V76 M148 70 H130 V76" stroke="#ffd34d" stroke-width="3.2" fill="none"></path>
+      <rect x="117" y="67" width="6" height="6" fill="#ffd34d"></rect>
+
+      <g clip-path="url(#tape-clip)">
+        <rect x="6" y="14" width="44" height="112" fill="#1a1f26"></rect>
+        <g data-spd-tape>
+          {Array.from({ length: 52 }, (_, i) => i * 10).map((v) => (
+            <g transform={`translate(0 ${-v * 2})`}>
+              <line x1="42" x2="50" y1="70" y2="70" stroke="#fff" stroke-width="1"></line>
+              {v % 20 === 0 && <text x="38" y="74" text-anchor="end" class="tape-num">{v}</text>}
+            </g>
+          ))}
+        </g>
+        <rect x="190" y="14" width="46" height="112" fill="#1a1f26"></rect>
+        <g data-alt-tape>
+          {Array.from({ length: 76 }, (_, i) => i * 500).map((v) => (
+            <g transform={`translate(0 ${-v * 0.08})`}>
+              <line x1="190" x2="197" y1="70" y2="70" stroke="#fff" stroke-width="1"></line>
+              {v % 1000 === 0 && <text x="200" y="74" class="tape-num">{v / 100}</text>}
+            </g>
+          ))}
+        </g>
+      </g>
+      <rect x="4" y="60" width="40" height="20" class="readout-box"></rect>
+      <text x="24" y="75" text-anchor="middle" class="readout" data-spd>0</text>
+      <rect x="192" y="60" width="46" height="20" class="readout-box"></rect>
+      <text x="215" y="75" text-anchor="middle" class="readout" data-alt>0</text>
+      <text x="120" y="144" text-anchor="middle" class="readout small" data-hdg>HDG 240</text>
+    </svg>
+
+    <div class="mcp" aria-hidden="true">
+      <div><span>IAS</span><b data-mcp="spd">000</b></div>
+      <div><span>HDG</span><b data-mcp="hdg">240</b></div>
+      <div><span>ALT</span><b data-mcp="alt">00000</b></div>
+      <div class="vsbox"><span>V/S</span><b data-mcp="vs">+0000</b></div>
+    </div>
+
+    <div class="engines" aria-hidden="true">
+      {[1, 2].map((e) => (
+        <div class="n1">
+          <svg viewBox="-34 -34 68 52">
+            <path class="n1-arc" d="M-28 6 A28 28 0 1 1 26 -10"></path>
+            <path class="n1-red" d="M23 -16 A28 28 0 0 1 26 -10"></path>
+            <line class="n1-needle" x1="0" y1="0" x2="0" y2="-26" data-n1-needle></line>
+          </svg>
+          <b data-n1>21.0</b>
+          <span>N1 · {e}</span>
+        </div>
+      ))}
+    </div>
+
+    <div class="phase-box">
+      <span>FLIGHT PHASE</span>
+      <b data-phase>PARKED</b>
+    </div>
+  </footer>
+
+  <main>
+    <!-- ═════════ 跑道 · 我是谁 ═════════ -->
+    <section class="leg hero" id="hero">
+      <p class="hero-kicker">RWY 24 · ZSNJ · CLEARED FOR TAKEOFF</p>
+      <h2 class="hero-name" data-repel aria-label={site.nameEn}>
+        {nameLetters.map((c) => <span class:list={['ch', c === ' ' && 'sp']}>{c === ' ' ? ' ' : c}</span>)}
+      </h2>
+      <p class="hero-cn">{site.name}<i>·</i>{site.callsign}</p>
+      <p class="hero-motto">{site.motto}</p>
+      <ul class="stats">
         {
-          projects.map((p, i) => (
-            <li
-              class={`work s${p.span}${p.active ? ' active' : ''}`}
-              id={`wpt-${i}`}
-              data-wpt={i}
-              data-reveal
-            >
-              <div class={`work-cover${p.cover ? ' shot' : ''}${p.coverDark ? ' dark' : ''}`}>
-                {
-                  p.cover ? (
-                    <Image
-                      class="shot-img"
-                      src={p.cover}
-                      alt={`${p.name} 界面截图`}
-                      widths={[420, 760, 1140]}
-                      sizes="(max-width: 900px) 100vw, (max-width: 1200px) 50vw, 700px"
-                      format="webp"
-                      quality={72}
-                      loading={i < 2 ? 'eager' : 'lazy'}
-                    />
-                  ) : (
-                    <Cover brg={p.brg} dist={p.dist} code={p.code} active={p.active} big={false} />
-                  )
-                }
-                <span class="cover-scrim" aria-hidden="true" />
-                <span class="cover-grid" aria-hidden="true" />
-                <span class="work-idx">{String(i + 1).padStart(2, '0')}</span>
-                <span class="work-code">{p.code}</span>
-              </div>
-              <div class="work-body">
-                <h3>
-                  {p.href ? (
-                    <a href={p.href} target="_blank" rel="noopener">
-                      {p.name}
-                    </a>
-                  ) : (
-                    p.name
-                  )}
-                </h3>
-                <p class="work-sub">{p.sub}</p>
-                <p class="work-desc">{p.desc}</p>
-                <div class="meta">
-                  {p.tags.map((t) => (
-                    <span class={`tag${t.kind ? ' ' + t.kind : ''}`}>{t.text}</span>
-                  ))}
-                </div>
-              </div>
+          stats.map((s) => (
+            <li>
+              <b data-count={s.value}>0</b>
+              {s.suffix}
+              <span>{s.label}</span>
             </li>
           ))
         }
-      </ol>
-    </div>
-  </section>
+      </ul>
+      <div class="throttle-hint">
+        <span class="lever"><i></i></span>
+        <span>向下滚动 = 推油门</span>
+      </div>
+    </section>
 
-  <section class="block" data-bearing="255">
-    <h2><span class="num">03</span>文章</h2>
-    <div class="body">
-      {
-        posts.length === 0 ? (
-          <p class="empty">还没有。</p>
-        ) : (
-          <ul class="posts">
-            {posts.map((post) => (
-              <li data-reveal>
-                <span class="d">{fmt(post.data.date)}</span>
-                <a class="t" href={`/log/${post.id}/`}>
-                  {post.data.title}
-                </a>
-                <p class="s">{post.data.summary}</p>
-              </li>
-            ))}
+    <!-- ═════════ 起飞 ═════════ -->
+    <section class="leg takeoff" data-leg="takeoff">
+      <div class="sticky">
+        <div class="quadrant" aria-hidden="true">
+          <span class="q-label">THRUST</span>
+          <div class="q-track"><span class="q-lever" data-lever></span></div>
+          <span class="q-scale">IDLE</span>
+          <span class="q-scale top">TO/GA</span>
+        </div>
+        <div class="takeoff-read">
+          <span>AIRSPEED</span>
+          <b data-big-spd>0</b>
+          <span>KT</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═════════ 爬升 · 机长资料 ═════════ -->
+    <section class="leg about" data-leg="about" id="captain">
+      <h2 class="leg-title" data-reveal><small>CLIMB · FL110</small>认识一下机长</h2>
+      <div class="about-grid">
+        <div class="license" data-tilt data-reveal>
+          <div class="lic-shine"></div>
+          <div class="lic-head">
+            <span>飞行执照 · PILOT LICENSE</span>
+            <span>No. WCL-0737</span>
+          </div>
+          <div class="lic-body">
+            <div class="lic-photo">围城</div>
+            <dl>
+              <dt>NAME</dt><dd>{site.name} / {site.nameEn}</dd>
+              <dt>CALLSIGN</dt><dd>{site.callsign}</dd>
+              <dt>BASE</dt><dd>ZSNJ 南京</dd>
+              <dt>SCHOOL</dt><dd>南京农业大学 · 国际经济与贸易 · 2026 级</dd>
+              <dt>RATINGS</dt><dd>AI PRODUCT · MULTI-AGENT · FULL-STACK</dd>
+              <dt>HOME</dt><dd>广东东莞 · 祖籍江西抚州</dd>
+            </dl>
+          </div>
+          <div class="lic-foot">
+            <span>模拟飞行 2020 起 · 最爱 737</span>
+            <span>日记写了六年</span>
+            <span>减压靠 5 公里</span>
+            <span>杀戮尖塔</span>
+          </div>
+        </div>
+
+        <div class="checklist" data-reveal>
+          <p class="ck-title">BEFORE TAKEOFF CHECKLIST</p>
+          <ul>
+            {
+              checklist.map((c) => (
+                <li>
+                  <button type="button" data-check>
+                    <span class="ck-item">{c.item}</span>
+                    <span class="ck-dots" />
+                    <span class="ck-state">{c.state}</span>
+                  </button>
+                </li>
+              ))
+            }
           </ul>
-        )
-      }
-    </div>
-  </section>
+          <p class="ck-done" data-ck-done>CHECKLIST COMPLETE</p>
+        </div>
+      </div>
+    </section>
 
-  <div class="tb-strip" style="border-top:1px solid var(--rule); border-bottom:0; position:relative; z-index:1;">
-    <span>EFF {eff}</span>
-    <span>END OF CHART</span>
-  </div>
+    <!-- ═════════ 巡航 · 作品 ═════════ -->
+    <section class="leg cruise" data-leg="cruise" id="works" style={`--n:${projects.length}`}>
+      <div class="sticky cruise-stage">
+        <div class="nav-side">
+          <div class="nd">
+            <svg viewBox="0 0 400 400" data-nd aria-label="导航显示器">
+              <defs>
+                <clipPath id="nd-clip"><rect x="0" y="40" width="400" height="360"></rect></clipPath>
+              </defs>
+              <g clip-path="url(#nd-clip)">
+                <g data-nd-rose>
+                  <circle cx="200" cy="330" r="270" class="nd-ring"></circle>
+                  {
+                    Array.from({ length: 72 }, (_, i) => i * 5).map((d) => (
+                      <g transform={`rotate(${d} 200 330)`}>
+                        <line x1="200" y1="60" x2="200" y2={d % 10 === 0 ? 74 : 67} class="nd-tick" />
+                        {d % 30 === 0 && (
+                          <text x="200" y="92" text-anchor="middle" class="nd-deg">
+                            {String(d / 10).padStart(2, '0')}
+                          </text>
+                        )}
+                      </g>
+                    ))
+                  }
+                </g>
+                <circle cx="200" cy="330" r="135" class="nd-range"></circle>
+                <g data-nd-map>
+                  <polyline data-nd-route class="nd-route"></polyline>
+                  {
+                    projects.map((p, i) => (
+                      <g data-nd-wpt={i} class="nd-wpt">
+                        <path d="M0 -9 L2.5 -2.5 L9 0 L2.5 2.5 L0 9 L-2.5 2.5 L-9 0 L-2.5 -2.5 Z" />
+                        <text x="12" y="4">{p.code}</text>
+                      </g>
+                    ))
+                  }
+                </g>
+              </g>
+              <path d="M200 316 L192 340 L200 335 L208 340 Z" class="nd-plane"></path>
+              <rect x="186" y="6" width="28" height="22" class="nd-hdgbox"></rect>
+              <text x="200" y="23" text-anchor="middle" class="nd-hdg" data-nd-hdg>240</text>
+              <text x="12" y="22" class="nd-gs">GS <tspan data-nd-gs>460</tspan></text>
+              <text x="388" y="22" text-anchor="end" class="nd-next" data-nd-next>ALPHA</text>
+              <text x="388" y="38" text-anchor="end" class="nd-dist" data-nd-dist>12.0 NM</text>
+            </svg>
+          </div>
+
+          <div class="fmc" data-fmc>
+            <div class="fmc-screen">
+              <p class="fmc-title">ACT RTE 1 LEGS</p>
+              <ol class="fmc-legs">
+                {
+                  projects.map((p, i) => (
+                    <li>
+                      <button type="button" data-goto={i}>
+                        <span class="fl-code">{p.code}</span>
+                        <span class="fl-name">{p.name}</span>
+                      </button>
+                    </li>
+                  ))
+                }
+              </ol>
+              <p class="fmc-scratch" data-scratch>直接敲代号，比如 ALPHA，回车</p>
+            </div>
+            <div class="fmc-keys" aria-label="FMC 键盘">
+              {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map((k) => <button type="button" data-key={k}>{k}</button>)}
+              <button type="button" class="fk-clr" data-key="CLR">CLR</button>
+              <button type="button" class="fk-exec" data-key="EXEC">EXEC</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="cards">
+          {
+            projects.map((p, i) => (
+              <article class="card" data-card={i} aria-label={p.name}>
+                <p class="card-wpt">
+                  <span>
+                    WPT {String(i + 1).padStart(2, '0')}/{String(projects.length).padStart(2, '0')}
+                  </span>
+                  <b>{p.code}</b>
+                  <span>{p.when}</span>
+                </p>
+                <h3 class="card-title" data-glitch={p.name}>
+                  {p.name}
+                </h3>
+                <p class="card-sub">{p.sub}</p>
+                {p.award && <p class="card-award">★ {p.award}</p>}
+                <div class="card-body">
+                  {p.image ? (
+                    <figure class="card-img">
+                      <Image src={p.image} alt={p.name} widths={[480, 800]} sizes="(min-width: 1000px) 30vw, 90vw" loading="eager" />
+                    </figure>
+                  ) : (
+                    <div class="card-mono" aria-hidden="true">
+                      {p.code.split('').map((c) => (
+                        <span>{c}</span>
+                      ))}
+                    </div>
+                  )}
+                  <div class="card-text">
+                    <p>{p.desc}</p>
+                    <dl>
+                      {p.role && (
+                        <>
+                          <dt>ROLE</dt>
+                          <dd>{p.role}</dd>
+                        </>
+                      )}
+                      <dt>STACK</dt>
+                      <dd>{p.stack}</dd>
+                    </dl>
+                    {p.links.length > 0 && (
+                      <p class="card-links">
+                        {p.links.map((l) => (
+                          <a href={l.href} target="_blank" rel="noopener">
+                            {l.text} ↗
+                          </a>
+                        ))}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </article>
+            ))
+          }
+        </div>
+      </div>
+    </section>
+
+    <!-- ═════════ 备降场 ═════════ -->
+    <section class="leg alternates" id="alternates">
+      <h2 class="leg-title" data-reveal><small>ALTERNATES · 备降场</small>没单独展开的小东西</h2>
+      <ul class="alt-grid">
+        {
+          alternates.map((a, i) => (
+            <li data-reveal style={`--d:${i * 60}ms`}>
+              <a href={a.href} target="_blank" rel="noopener" class="alt-card">
+                <span class="alt-icao">{a.icao}</span>
+                <span class="alt-name">{a.name}</span>
+                <span class="alt-note">{a.note}</span>
+                <span class="alt-sweep" aria-hidden="true" />
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </section>
+
+    <!-- ═════════ 飞行日志 ═════════ -->
+    <section class="leg logbook" data-leg="logbook" id="logbook">
+      <h2 class="leg-title" data-reveal><small>PILOT LOGBOOK · 飞行日志</small>一路飞过来的</h2>
+      <div class="log-paper" data-reveal>
+        <div class="log-head">
+          <span>DATE</span><span>FROM</span><span>TO</span><span>REMARKS</span>
+        </div>
+        {
+          logbook.map((l) => (
+            <div class="log-row" data-reveal>
+              <span class="lg-date">{l.date}</span>
+              <span class="lg-ap">{l.from}</span>
+              <span class="lg-ap">{l.to}</span>
+              <span class="lg-remark">{l.remark}</span>
+              {l.stamp && <span class="stamp">{l.stamp}</span>}
+            </div>
+          ))
+        }
+        <p class="log-sign">机长签字：<span>{site.name}</span></p>
+      </div>
+    </section>
+
+    <!-- ═════════ 进近落地 · 联系 ═════════ -->
+    <section class="leg landing" data-leg="landing" id="contact">
+      <div class="sticky landing-stage">
+        <div class="ra" data-ra aria-hidden="true">
+          <span>RADIO ALT</span>
+          <b data-ra-num>2500</b>
+        </div>
+        <div class="welcome" data-welcome>
+          <p class="wc-small">ZSNJ · NANJING LUKOU · <span data-localtime>--:--</span> 当地时间</p>
+          <p class="wc-big">欢迎来到南京</p>
+          <p class="wc-small">WELCOME TO NANJING</p>
+        </div>
+        <div class="radio" data-radio>
+          <p class="radio-title">COM 1 · 调到一个频率联系我</p>
+          <div class="radio-faces">
+            <div class="rf"><span>ACTIVE</span><b data-active>{radio[0].freq}</b></div>
+            <button type="button" class="xfer" data-xfer aria-label="切换频率">⇄</button>
+            <div class="rf stby"><span>STANDBY</span><b data-stby>{radio[1].freq}</b></div>
+            <button type="button" class="knob" data-knob aria-label="旋转调频（也可以用滚轮或方向键）"><span></span></button>
+          </div>
+          <div class="radio-out" data-radio-out>
+            <span class="ro-label" data-ro-label>{radio[0].label}</span>
+            <a class="ro-value" data-ro-value href={radio[0].href}>{radio[0].value}</a>
+          </div>
+          <ul class="radio-list">
+            {
+              radio.map((r, i) => (
+                <li>
+                  <button type="button" data-tune={i}>
+                    <span>{r.freq}</span>
+                    {r.label}
+                  </button>
+                </li>
+              ))
+            }
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <footer class="end">
+      <p>全部画面由代码实时绘制 · 不可用于真实飞行</p>
+      <p>© 2026 {site.name} · <button type="button" class="link-btn" data-reboot>重新开机 ↺</button></p>
+    </footer>
+  </main>
+
+  <script type="application/json" id="flight-data" set:html={JSON.stringify({ radio, codes: projects.map((p) => p.code) })} />
+  <script>
+    import '../scripts/main';
+  </script>
 </Base>

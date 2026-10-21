@@ -2,10 +2,52 @@
 import Base from '../layouts/Base.astro';
 ---
 
-<Base title="偏航">
-  <div class="lost">
-    <h1>404</h1>
-    <p>这个航路点不存在。</p>
-    <p><a href="/">← 回首页</a></p>
-  </div>
+<Base title="NOT IN DATA BASE">
+  <main class="nf">
+    <p class="nf-code">404</p>
+    <p class="nf-msg">NOT IN DATA BASE</p>
+    <p class="nf-cn">这个航路点不在导航数据库里。</p>
+    <a class="nf-btn" href="/">DIRECT TO 首页 →</a>
+  </main>
 </Base>
+
+<style>
+  .nf {
+    min-height: 100svh;
+    display: grid;
+    place-content: center;
+    text-align: center;
+    gap: 0.6rem;
+    padding: 2rem;
+  }
+  .nf-code {
+    font-family: var(--mono);
+    font-size: clamp(5rem, 20vw, 12rem);
+    line-height: 1;
+    margin: 0;
+    color: var(--magenta);
+    text-shadow: 0 0 40px rgba(255, 61, 245, 0.5);
+  }
+  .nf-msg {
+    font-family: var(--mono);
+    color: var(--amber);
+    letter-spacing: 0.3em;
+    margin: 0;
+  }
+  .nf-cn {
+    color: var(--dim);
+    margin: 0 0 1.5rem;
+  }
+  .nf-btn {
+    justify-self: center;
+    font-family: var(--mono);
+    color: var(--cyan);
+    border: 1px solid var(--cyan);
+    padding: 0.6rem 1.2rem;
+    text-decoration: none;
+  }
+  .nf-btn:hover {
+    background: var(--cyan);
+    color: #000;
+  }
+</style>
