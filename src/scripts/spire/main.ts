@@ -222,10 +222,20 @@ const closeScreen = () => {
   current = null;
 };
 
-const openScreen = (el: HTMLElement, floor = -1) => {
+const baseTitle = document.title;
+const openScreen = (el: HTMLElement, floor = -1, from?: Element) => {
   if (current === el) return;
+  // 从地图上点进来的：画面像墨水一样从那一格晕开
+  el.classList.remove('from-node');
+  if (from && !calm) {
+    const r = from.getBoundingClientRect();
+    el.style.setProperty('--ox', `${Math.round(r.left + r.width / 2)}px`);
+    el.style.setProperty('--oy', `${Math.round(r.top + r.height / 2)}px`);
+    el.classList.add('from-node');
+  }
   closeScreen();
   setView('screen');
+  document.title = `${el.getAttribute('aria-label') ?? el.querySelector('h2')?.textContent ?? ''} · ${baseTitle}`;
   current = el;
   currentFloor = floor;
   el.classList.add('on');
@@ -244,6 +254,14 @@ const openScreen = (el: HTMLElement, floor = -1) => {
     sfx.card();
     setTimeout(() => sfx.card(), 140);
   } else sfx.enter(el.classList.contains('scr-boss'));
+  // 商人：顶栏的遗物（技能）一个接一个亮一下
+  if (el.classList.contains('scr-shop')) {
+    $$('.sp-relics li').forEach((li, i) => {
+      li.classList.remove('flash');
+      setTimeout(() => li.classList.add('flash'), 300 + i * 90);
+      setTimeout(() => li.classList.remove('flash'), 1300 + i * 90);
+    });
+  }
   if (floor >= 0) {
     markSeen(floor);
     if (tokFloor !== floor) {
@@ -255,6 +273,7 @@ const openScreen = (el: HTMLElement, floor = -1) => {
 };
 
 const showMap = () => {
+  document.title = baseTitle;
   const from = currentFloor;
   closeScreen();
   currentFloor = -1;
@@ -278,6 +297,7 @@ const showMap = () => {
 };
 
 const showHero = () => {
+  document.title = baseTitle;
   closeScreen();
   currentFloor = -1;
   setView('hero');
@@ -293,8 +313,9 @@ const route = async () => {
   if (m && el) {
     const n = Number(m[1]);
     // 在地图上点的：先让小鸭子走过去
-    if (root.dataset.view === 'map' && toured && !touring) await walkTo(n);
-    return openScreen(el, n);
+    const fromMap = root.dataset.view === 'map' && toured && !touring;
+    if (fromMap) await walkTo(n);
+    return openScreen(el, n, fromMap ? (nodes.get(n)?.el.querySelector('.ic') ?? undefined) : undefined);
   }
   showMap();
 };
@@ -352,9 +373,69 @@ addEventListener('keydown', (e) => {
 
 /* ───── 地图上的小互动 ───── */
 
-for (const [, { el }] of nodes) {
-  el.addEventListener('pointerenter', () => sfx.hover());
-  el.addEventListener('focus', () => sfx.hover());
+/* 指着一层：通往它的那段路和左边的日期一起亮起来 */
+const hot = (n: number, on: boolean) => {
+  $$(`[data-edge="${n}"], [data-date="${n}"]`, map).forEach((e) => e.classList.toggle('hot', on));
+};
+for (const [n, { el }] of nodes) {
+  el.addEventListener('pointerenter', () => {
+    sfx.hover();
+    hot(n, true);
+  });
+  el.addEventListener('pointerleave', () => hot(n, false));
+  el.addEventListener('focus', () => {
+    sfx.hover();
+    hot(n, true);
+  });
+  el.addEventListener('blur', () => hot(n, false));
+}
+
+/* 键盘：在地图上按上下键，沿着走过的路一层一层挪 */
+addEventListener('keydown', (e) => {
+  if (root.dataset.view !== 'map' || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+  const focused = document.activeElement?.closest<SVGAElement>('[data-node]');
+  const at = focused ? Number(focused.dataset.node) : e.key === 'ArrowUp' ? tokFloor - 1 : tokFloor + 1;
+  const n = at + (e.key === 'ArrowUp' ? 1 : -1);
+  const target = nodes.get(n);
+  if (!target) return;
+  e.preventDefault();
+  target.el.focus({ preventScroll: true });
+  const r = target.el.getBoundingClientRect();
+  if (r.top < 120 || r.bottom > innerHeight - 80) scrollToMapY(target.y, 0.5, true);
+});
+
+/* 鼠标按住地图拖着走，像游戏里那样 */
+if (finePointer) {
+  let drag: { y: number; top: number; moved: boolean } | null = null;
+  mapWrap.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 || e.pointerType !== 'mouse' || (e.target as Element).closest('button, .legend')) return;
+    drag = { y: e.clientY, top: scrollY, moved: false };
+  });
+  addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const dy = e.clientY - drag.y;
+    if (!drag.moved && Math.abs(dy) < 6) return;
+    if (!drag.moved) {
+      drag.moved = true;
+      root.classList.add('dragging');
+      hideTip();
+    }
+    window.scrollTo(0, drag.top - dy);
+  });
+  addEventListener('pointerup', () => {
+    if (!drag) return;
+    const moved = drag.moved;
+    drag = null;
+    root.classList.remove('dragging');
+    // 拖过就不算点
+    if (!moved) return;
+    const swallow = (ev: Event) => {
+      ev.stopPropagation();
+      ev.preventDefault();
+    };
+    addEventListener('click', swallow, true);
+    setTimeout(() => removeEventListener('click', swallow, true), 0);
+  });
 }
 
 for (const g of $$<SVGGElement>('[data-ghost]')) {
@@ -408,7 +489,11 @@ for (const btn of $$<HTMLButtonElement>('[data-rest]')) {
     line.classList.remove('say');
     void line.offsetWidth;
     line.classList.add('say');
-    sfx.pick();
+    const fire = $('.fire', btn.closest('.scr')!);
+    fire?.classList.remove('flare');
+    void fire?.getBoundingClientRect();
+    fire?.classList.add('flare');
+    sfx.flare();
   });
 }
 
@@ -465,8 +550,8 @@ function closeInspect() {
   inspectBox.replaceChildren();
   sfx.card();
 }
-for (const card of $$<HTMLElement>('.fight [data-card]')) {
-  card.addEventListener('click', () => {
+function openInspect(card: HTMLElement) {
+  {
     const big = card.cloneNode(true) as HTMLElement;
     big.classList.remove('tilting');
     big.style.cssText = '';
@@ -476,9 +561,93 @@ for (const card of $$<HTMLElement>('.fight [data-card]')) {
     inspectBox.hidden = false;
     hideTip();
     sfx.card();
+  }
+}
+for (const card of $$<HTMLElement>('.fight [data-card]')) card.addEventListener('click', () => openInspect(card));
+inspectBox.addEventListener('click', closeInspect);
+
+/* 奖励里的两行也能点：卡牌那行放大看卡，金币那行让顶栏的金币跳一下 */
+const activate = (el: HTMLElement, fn: () => void) => {
+  el.addEventListener('click', fn);
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      fn();
+    }
+  });
+};
+for (const row of $$<HTMLElement>('[data-card-row]')) {
+  activate(row, () => {
+    const card = $<HTMLElement>('.fight [data-card]', row.closest('.scr')!);
+    if (card) openInspect(card);
   });
 }
-inspectBox.addEventListener('click', closeInspect);
+const goldStat = $('.sp-gold');
+for (const row of $$<HTMLElement>('[data-gold-row]')) {
+  activate(row, () => {
+    goldStat?.classList.remove('bump');
+    void goldStat?.getBoundingClientRect();
+    goldStat?.classList.add('bump');
+    sfx.coin();
+    toast('这一万块，后来全给了 KinoLens。');
+  });
+}
+
+/* 牌组：随便抽一张，转一圈停在哪张就去哪一层 */
+const drawBtn = $<HTMLButtonElement>('[data-draw]');
+drawBtn?.addEventListener('click', () => {
+  const slots = $$<HTMLElement>('.deck-slot:not(.dim)');
+  if (!slots.length || drawBtn.disabled) return;
+  drawBtn.disabled = true;
+  const pick = Math.floor(Math.random() * slots.length);
+  const spins = calm ? pick : slots.length * 2 + pick;
+  let i = calm ? pick : 0;
+  const step = () => {
+    slots.forEach((s) => s.classList.remove('lit'));
+    const s = slots[i % slots.length];
+    s.classList.add('lit');
+    if (i < spins) {
+      sfx.hover();
+      i++;
+      // 越转越慢
+      setTimeout(step, 40 + (i / Math.max(1, spins)) ** 3 * 260);
+    } else {
+      sfx.card();
+      setTimeout(() => {
+        s.classList.remove('lit');
+        drawBtn.disabled = false;
+        const href = s.querySelector<HTMLAnchorElement>('.card-link')?.getAttribute('href');
+        if (href) go(href);
+      }, 650);
+    }
+  };
+  step();
+});
+
+/* 手机上：在某一层里左右滑，去上一层 / 下一层 */
+let touch: { x: number; y: number } | null = null;
+addEventListener(
+  'touchstart',
+  (e) => {
+    touch = root.dataset.view === 'screen' && currentFloor >= 0 && e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null;
+  },
+  { passive: true },
+);
+addEventListener(
+  'touchend',
+  (e) => {
+    if (!touch || !inspectBox.hidden) return;
+    const dx = e.changedTouches[0].clientX - touch.x;
+    const dy = e.changedTouches[0].clientY - touch.y;
+    touch = null;
+    if (Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * 0.6) return;
+    const n = currentFloor + (dx < 0 ? 1 : -1);
+    if (!nodes.has(n)) return;
+    sfx.ink();
+    go(`#f-${n}`);
+  },
+  { passive: true },
+);
 
 /* ───── 角色档案：戳一下可达鸭 ───── */
 

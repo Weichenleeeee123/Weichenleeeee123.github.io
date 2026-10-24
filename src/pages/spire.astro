@@ -247,6 +247,18 @@ const potionIcons = radio.map((_, i) => potion(potionColors[i] ?? '#ccc'));
           <p class="hp-plate">全栈鸭</p>
         </div>
       </div>
+      <nav class="roster" aria-label="换一个角色：另外两种风格">
+        <span class="ro-title">角色</span>
+        <span class="ro-pick on" aria-current="true" data-tip="围城爬塔|就是这一页">
+          <Image src={avatar} alt="" width={96} height={96} />
+        </span>
+        <a class="ro-pick" href="/cockpit/" data-style-switch="cockpit" data-tip="机长|换成 737 驾驶舱风格" aria-label="换成 737 驾驶舱风格">
+          <svg viewBox="-12 -12 24 24" aria-hidden="true"><path d="M0 -10 L2 -3 L10 2 L10 4 L2 2 L1.5 7 L4 9 L4 10.5 L0 9.5 L-4 10.5 L-4 9 L-1.5 7 L-2 2 L-10 4 L-10 2 L-2 -3 Z" /></svg>
+        </a>
+        <a class="ro-pick" href="/studio/" data-style-switch="studio" data-tip="宅家|换成围城的房间" aria-label="换成围城的房间">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7v9H4z" /><path d="M10 20v-5h4v5" /></svg>
+        </a>
+      </nav>
       <div class="hero-go">
         <a class="btn-ghost" href="#deck">先看牌组 · {projects.length} 张</a>
         <a class="btn-embark" href="#map" data-embark><span>出发</span></a>
@@ -319,15 +331,15 @@ const potionIcons = radio.map((_, i) => potion(potionColors[i] ?? '#ccc'));
           </g>
 
           <g class="dates" aria-hidden="true">
-            {realNodes.map(([, y], f) => <text x="26" y={y + 6} class:list={[floors[f].kind]}>{floors[f].date}</text>)}
-            <text x="26" y={BOSS_Y + 6}>{floors[steps].date}</text>
+            {realNodes.map(([, y], f) => <text x="26" y={y + 6} data-date={f}>{floors[f].date}</text>)}
+            <text x="26" y={BOSS_Y + 6} data-date={steps}>{floors[steps].date}</text>
           </g>
 
           <g class="paths ghost" aria-hidden="true">
             {ghostLines.map((l) => <line {...l} />)}
           </g>
           <g class="paths real" mask="url(#reveal)" aria-hidden="true">
-            {realLines.map((l, i) => <line {...l} style={`--i:${i}`} />)}
+            {realLines.map((l, i) => <line {...l} data-edge={i + 1} />)}
           </g>
 
           {
@@ -454,7 +466,7 @@ const potionIcons = radio.map((_, i) => potion(potionColors[i] ?? '#ccc'));
                     <div class="loot">
                       <ul class="rewards" aria-label="奖励">
                         {f.gold && (
-                          <li class="rw rw-gold">
+                          <li class="rw rw-gold" data-gold-row tabindex="0">
                             <svg viewBox="0 0 24 24" aria-hidden="true" set:html={coin} />
                             <span>
                               <b>{f.gold.amount} 金币</b>
@@ -471,7 +483,7 @@ const potionIcons = radio.map((_, i) => potion(potionColors[i] ?? '#ccc'));
                             </span>
                           </li>
                         )}
-                        <li class="rw rw-card">
+                        <li class="rw rw-card" data-card-row tabindex="0">
                           <svg viewBox="0 0 24 24" aria-hidden="true" set:html={cardIc} />
                           <span>
                             <b>卡牌 · {p.name}</b>
@@ -686,6 +698,11 @@ const potionIcons = radio.map((_, i) => potion(potionColors[i] ?? '#ccc'));
                         <rect x="-12" y="-24" width="24" height="28" rx="4" class="lock" />
                       </g>
                     </svg>
+                    <span class="sparks" aria-hidden="true">
+                      {Array.from({ length: 16 }, (_, k) => (
+                        <i style={`--a:${-170 + k * 11 + ((k * 7) % 5)}deg;--d:${90 + ((k * 37) % 70)}px;--t:${0.05 + (k % 4) * 0.04}s`} class:list={[k % 3 === 0 && 'coin']} />
+                      ))}
+                    </span>
                     <span class="chest-hint">点开宝箱</span>
                   </button>
                   <ul class="trinkets">
@@ -809,6 +826,7 @@ const potionIcons = radio.map((_, i) => potion(potionColors[i] ?? '#ccc'));
               <button type="button" data-filter="攻击" aria-pressed="false">攻击 · 比赛</button>
               <button type="button" data-filter="技能" aria-pressed="false">技能 · 工具</button>
               <button type="button" data-filter="能力" aria-pressed="false">能力 · 长期</button>
+              <button type="button" class="draw" data-draw>随便抽一张</button>
             </div>
           </header>
           <div class="deck-grid">

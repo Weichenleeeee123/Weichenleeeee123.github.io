@@ -198,6 +198,16 @@ export class Sfx {
     o.stop(t + 0.3);
   }
 
+  /** 篝火窜一下：呼的一声 */
+  flare() {
+    const ctx = this.go();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const f = this.burst(ctx, t, 'bandpass', 300, 0.8, 0.3, 0.55, 0.08);
+    f.frequency.exponentialRampToValueAtTime(1400, t + 0.5);
+    for (let i = 0; i < 6; i++) this.burst(ctx, t + 0.1 + Math.random() * 0.4, 'highpass', 2500 + Math.random() * 2500, 0.8, 0.08, 0.03, 0.001);
+  }
+
   /** 选了一个选项 */
   pick() {
     const ctx = this.go();

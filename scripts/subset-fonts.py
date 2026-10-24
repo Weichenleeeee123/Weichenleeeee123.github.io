@@ -64,7 +64,7 @@ def collect():
         + fields(site, 'item')
         + fields(site, 'label')
         + ''.join(re.findall(r"toast\(['`]([^'`$]*)", spire_js))
-        + '遗物药水第层最后声音已复制已击败从头再爬嘎？……头有点疼。别戳了，去爬塔吧。全部看完了谢谢你到这里'
+        + '遗物药水第层最后声音已复制已击败从头再爬机长宅家嘎？……头有点疼。别戳了，去爬塔吧。全部看完了谢谢你到这里'
     )
     spire_hand = (
         fields(spire, 'label')
