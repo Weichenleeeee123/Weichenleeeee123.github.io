@@ -1,5 +1,5 @@
 import { World } from './world';
-import { Sound } from './audio';
+import { Sound, type Clip } from './audio';
 import { blank, target, approach, routeHeadings, type Flight, type Legs } from './flight';
 
 const $ = <T extends Element = HTMLElement>(s: string, root: ParentNode = document) => root.querySelector<T>(s)!;
@@ -43,13 +43,13 @@ const legs: Legs = {
 
 /* ═════════ 呼叫 ═════════ */
 const calloutEl = $('[data-callout]');
-function callout(text: string, color: '' | 'green' | 'red' = '', speech?: string) {
+function callout(text: string, color: '' | 'green' | 'red' = '', clip?: Clip) {
   calloutEl.textContent = text;
   calloutEl.className = 'callout';
   void calloutEl.offsetWidth; // 重新触发动画
   calloutEl.classList.add('go');
   if (color) calloutEl.classList.add(color);
-  if (speech) sound.say(speech);
+  if (clip) sound.voice(clip);
 }
 
 const up = (a: number, b: number, t: number) => a < t && b >= t;
@@ -71,24 +71,33 @@ function triggers(tgt: Flight) {
   }
   const p = prev;
   if (cur.phase === 'takeoff' || cur.phase === 'climb' || cur.phase === 'ground') {
-    if (up(p.n1, cur.n1, 85)) callout('THRUST SET', 'green', 'thrust set');
-    if (up(p.speed, cur.speed, 80)) callout('80 KT', '', 'eighty knots');
-    if (up(p.speed, cur.speed, 138)) callout('V1', '', 'vee one');
-    if (up(p.pitch, cur.pitch, 3) && cur.alt < 50) callout('ROTATE', 'green', 'rotate');
-    if (up(p.alt, cur.alt, 60)) callout('POSITIVE RATE', 'green', 'positive rate');
-    if (up(p.alt, cur.alt, 900)) callout('GEAR UP', '', 'gear up');
+    if (up(p.n1, cur.n1, 85)) callout('THRUST SET', 'green', 'pm_thrust_set');
+    if (up(p.speed, cur.speed, 80)) callout('80 KT', '', 'pm_80');
+    if (up(p.speed, cur.speed, 138)) callout('V1', '', 'pm_v1');
+    if (up(p.pitch, cur.pitch, 3) && cur.alt < 50) callout('ROTATE', 'green', 'pm_rotate');
+    if (up(p.alt, cur.alt, 60)) callout('POSITIVE RATE', 'green', 'pm_positive');
+    if (up(p.alt, cur.alt, 900)) {
+      callout('GEAR UP', '', 'pm_gear_up');
+      setTimeout(() => sound.gearClunk(), 900);
+    }
   }
-  if (up(p.alt, cur.alt, 10000)) callout('10,000 FT', 'green', 'ten thousand');
-  if (up(p.alt, cur.alt, 34800)) callout('FL350', 'green', 'cruise, flight level three five zero');
+  // 过一万英尺时区调给高度
+  if (up(p.alt, cur.alt, 10000)) {
+    callout('FL350', 'green');
+    sound.voice('atc_climb');
+  }
 
   if (cur.phase === 'landing') {
-    if (down(p.alt, cur.alt, 2500)) callout('2500', 'green', 'twenty five hundred');
-    if (down(p.alt, cur.alt, 1000)) callout('1000', 'green', 'one thousand');
-    if (down(p.alt, cur.alt, 500)) callout('500', 'green', 'five hundred');
-    if (down(p.alt, cur.alt, 220)) callout('MINIMUMS', '', 'minimums');
-    if (down(p.alt, cur.alt, 100)) callout('100', 'green', 'one hundred');
-    for (const n of [50, 40, 30, 20, 10]) if (down(p.alt, cur.alt, n)) callout(String(n), 'green', n === 20 ? 'twenty, retard, retard' : String(n));
+    if (down(p.alt, cur.alt, 8000)) sound.voice('atc_land');
+    if (down(p.alt, cur.alt, 2500)) callout('2500', 'green', 'gpws_2500');
+    if (down(p.alt, cur.alt, 1000)) callout('1000', 'green', 'gpws_1000');
+    if (down(p.alt, cur.alt, 500)) callout('500', 'green', 'gpws_500');
+    if (down(p.alt, cur.alt, 220)) callout('MINIMUMS', '', 'gpws_minimums');
+    if (down(p.alt, cur.alt, 100)) callout('100', 'green', 'gpws_100');
+    // 737 只报到 10，没有空客那句 "retard"
+    for (const n of [50, 40, 30, 20, 10] as const) if (down(p.alt, cur.alt, n)) callout(String(n), 'green', `gpws_${n}`);
   }
+  if (up(lastLanding, tgt.landing, 0.86)) sound.voice('atc_welcome');
   // 接地：只在往前飞时发生
   if (up(lastLanding, tgt.landing, 0.8)) {
     cur.shake = 1;
@@ -102,7 +111,7 @@ function triggers(tgt: Flight) {
     void document.body.offsetWidth;
     document.body.classList.add('slam');
   }
-  if (cur.phase === 'landing' && down(p.speed, cur.speed, 60) && cur.alt < 1) callout('60 KT', '', 'sixty knots');
+  if (cur.phase === 'landing' && down(p.speed, cur.speed, 60) && cur.alt < 1) callout('60 KT', '', 'pm_60');
   lastLanding = tgt.landing;
 }
 
@@ -469,7 +478,7 @@ function tick(now: number) {
   instruments(cur);
   nd(cur, dt);
   showCard(cur.phase === 'cruise' && cur.cruise < 1 ? tgt.wpt : cur.cruise >= 1 ? N - 1 : 0);
-  sound.update(cur.n1, cur.speed, 1);
+  sound.update(cur.n1, cur.speed, cur.alt);
   repel();
   route();
 }
@@ -552,7 +561,8 @@ async function finish() {
   html.classList.add('flying');
   setTimeout(() => boot.classList.add('done'), 1300);
   await sleep(900);
-  callout('READY FOR TAKEOFF', 'green', 'ready for departure');
+  callout('READY FOR TAKEOFF', 'green');
+  sound.voice('atc_takeoff');
 }
 
 start.addEventListener('click', async () => {
