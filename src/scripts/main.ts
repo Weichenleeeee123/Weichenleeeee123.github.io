@@ -478,7 +478,7 @@ function tick(now: number) {
   instruments(cur);
   nd(cur, dt);
   showCard(cur.phase === 'cruise' && cur.cruise < 1 ? tgt.wpt : cur.cruise >= 1 ? N - 1 : 0);
-  sound.update(cur.n1, cur.speed, cur.alt);
+  sound.update(cur.n1, cur.speed, cur.alt, cur.phase === 'cruise');
   repel();
   route();
 }
@@ -490,6 +490,7 @@ requestAnimationFrame(frame);
 // 调试用：页面在后台时 rAF 不跑，可以手动推进 n 帧
 (window as unknown as { __flight: unknown }).__flight = {
   cur,
+  sound,
   step: (n = 1) => {
     for (let i = 0; i < n; i++) tick(last + 33);
     last = performance.now();

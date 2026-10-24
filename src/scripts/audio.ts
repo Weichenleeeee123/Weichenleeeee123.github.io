@@ -1,18 +1,19 @@
 /*
- * 驾驶舱声音。分两类：
+ * 驾驶舱声音。分三类：
  *
  * 1. 语音：预先用神经网络 TTS 生成、再按「出声设备」处理过的 mp3（scripts/gen-voices.py）。
  *    副驾驶走耳机内话，GPWS 从驾驶舱小喇叭出来，塔台走 VHF 无线电。
  *    同一个频道里新的一句会打断上一句，跟真实驾驶舱一样。
  *
- * 2. 音效：全部现场合成，按层叠起来——
- *    轰鸣   粉红噪声 → 低通，截止频率随 N1 升高，并带两路慢速随机起伏（发动机在「呼吸」）
- *    啸叫   三个不成整数倍的正弦泛音，启动时从低到高爬升，带轻微颤动
- *    核心   一路很低的正弦，给声音一点「分量」
- *    空调   驾驶舱一直有的底噪
- *    风噪   带通噪声，随空速平方变大
- *    跑道   压过道面接缝的「咔噔」，间隔随地速变短
- *    其余   开关的机械咔哒、收轮闷响、接地的轮胎尖啸、无线电调台的沙沙声
+ * 2. 音乐：巡航段放《茉莉花》（江苏民歌，代码编曲，scripts/gen-music.py），这时发动机声压低。
+ *
+ * 3. 音效：全部现场合成。两台发动机分别放在左右声道，每台都由三层噪声组成——
+ *    轰鸣   粉红噪声 → 低通，截止频率随 N1 升高，带慢速随机起伏
+ *    风扇   白噪声 → 很窄的带通，中心频率跟着风扇转速走：真实风扇的啸叫就是这种「有音高的嘶声」
+ *    核心   低通到 100Hz 以下的噪声，给声音分量
+ *    两台发动机转速差千分之几，风扇声之间会出现双发飞机特有的缓慢拍频。
+ *    再加上空调底噪、风噪、跑道接缝、收轮闷响、接地轮胎尖啸、开关咔哒、无线电沙沙声。
+ *    发动机和风噪最后过一道低通，模拟驾驶舱的隔音。
  */
 
 export type Clip =
@@ -29,28 +30,41 @@ const CLIPS: Clip[] = [
 ];
 
 const VOLUME = 0.6;
+const ENGINE_LEVEL = 0.9;
+const MUSIC_LEVEL = 0.32;
+
+type Engine = {
+  roarLp: BiquadFilterNode;
+  roar: GainNode;
+  fan: BiquadFilterNode;
+  fan2: BiquadFilterNode;
+  fanGain: GainNode;
+  core: GainNode;
+  /** 这台发动机比名义转速快多少（拍频来源） */
+  offset: number;
+  phase: number;
+};
 
 export class Sound {
   private ctx?: AudioContext;
   private master?: GainNode;
-  private engine?: GainNode;
+  private engineBus?: GainNode;
   private sfx?: GainNode;
   private voiceBus?: GainNode;
+  private musicBus?: GainNode;
 
-  private roarLp?: BiquadFilterNode;
-  private roar?: GainNode;
-  private whine?: GainNode;
-  private whineOsc: OscillatorNode[] = [];
-  private core?: OscillatorNode;
-  private coreGain?: GainNode;
-  private packs?: GainNode;
+  private engines: Engine[] = [];
   private wind?: GainNode;
   private windBp?: BiquadFilterNode;
   private pink?: AudioBuffer;
   private white?: AudioBuffer;
+  private brown?: AudioBuffer;
 
   private clips = new Map<Clip, AudioBuffer>();
   private channels = new Map<string, AudioBufferSourceNode>();
+  private music?: AudioBuffer;
+  private musicSrc?: AudioBufferSourceNode;
+  private musicOn = false;
   private nextJoint = 0;
   muted: boolean;
 
@@ -63,75 +77,92 @@ export class Sound {
     const ctx = new AudioContext();
     this.ctx = ctx;
 
-    // 总线：发动机、音效、语音分开调，最后过一个压缩器防爆音
+    // 总线：发动机、音效、语音、音乐分开调，最后过一个压缩器防爆音
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -14;
     comp.ratio.value = 3;
     this.master = ctx.createGain();
     this.master.gain.value = this.muted ? 0 : VOLUME;
     this.master.connect(comp).connect(ctx.destination);
-    this.engine = this.bus(0.9);
+
+    // 发动机总线后面接一道低通：驾驶舱隔音把高频吃掉了
+    const cabin = ctx.createBiquadFilter();
+    cabin.type = 'lowpass';
+    cabin.frequency.value = 5200;
+    cabin.Q.value = 0.4;
+    this.engineBus = ctx.createGain();
+    this.engineBus.gain.value = ENGINE_LEVEL;
+    this.engineBus.connect(cabin).connect(this.master);
     this.sfx = this.bus(0.8);
     this.voiceBus = this.bus(1);
+    this.musicBus = this.bus(0);
 
-    this.pink = this.noiseBuffer(ctx, 'pink', 4);
-    this.white = this.noiseBuffer(ctx, 'white', 2);
+    this.pink = this.noiseBuffer(ctx, 'pink', 5);
+    this.white = this.noiseBuffer(ctx, 'white', 3);
+    this.brown = this.noiseBuffer(ctx, 'brown', 5);
 
-    // 轰鸣
-    this.roarLp = ctx.createBiquadFilter();
-    this.roarLp.type = 'lowpass';
-    this.roarLp.Q.value = 0.5;
-    this.roarLp.frequency.value = 150;
-    this.roar = ctx.createGain();
-    this.roar.gain.value = 0;
-    this.loop(this.pink).connect(this.roarLp).connect(this.roar).connect(this.engine);
-
-    // 啸叫：三个泛音，比例故意不整，听起来才像风扇叶片而不是合成器
-    const whineLp = ctx.createBiquadFilter();
-    whineLp.type = 'lowpass';
-    whineLp.frequency.value = 4200;
-    this.whine = ctx.createGain();
-    this.whine.gain.value = 0;
-    whineLp.connect(this.whine).connect(this.engine);
-    for (const [ratio, amp] of [[1, 1], [2.03, 0.45], [3.51, 0.18]]) {
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
-      o.type = 'sine';
-      o.frequency.value = 200 * ratio;
-      g.gain.value = amp;
-      o.connect(g).connect(whineLp);
-      o.start();
-      this.whineOsc.push(o);
-    }
-
-    // 核心低频
-    this.core = ctx.createOscillator();
-    this.core.type = 'triangle';
-    this.core.frequency.value = 40;
-    this.coreGain = ctx.createGain();
-    this.coreGain.gain.value = 0;
-    this.core.connect(this.coreGain).connect(this.engine);
-    this.core.start();
+    this.engines = [-0.55, 0.55].map((pan, i) => this.makeEngine(pan, i === 0 ? 0 : 0.0045));
 
     // 空调底噪
     const packsBp = ctx.createBiquadFilter();
     packsBp.type = 'bandpass';
-    packsBp.frequency.value = 2600;
+    packsBp.frequency.value = 2400;
     packsBp.Q.value = 0.35;
-    this.packs = ctx.createGain();
-    this.packs.gain.value = 0.018;
-    this.loop(this.white).connect(packsBp).connect(this.packs).connect(this.engine);
+    const packs = ctx.createGain();
+    packs.gain.value = 0.016;
+    this.loop(this.white).connect(packsBp).connect(packs).connect(this.engineBus);
 
     // 风噪
     this.windBp = ctx.createBiquadFilter();
     this.windBp.type = 'bandpass';
-    this.windBp.Q.value = 0.6;
+    this.windBp.Q.value = 0.55;
     this.windBp.frequency.value = 500;
     this.wind = ctx.createGain();
     this.wind.gain.value = 0;
-    this.loop(this.pink).connect(this.windBp).connect(this.wind).connect(this.engine);
+    this.loop(this.pink).connect(this.windBp).connect(this.wind).connect(this.engineBus);
 
     void this.loadClips();
+    void this.loadMusic();
+  }
+
+  private makeEngine(pan: number, offset: number): Engine {
+    const ctx = this.ctx!;
+    const out = ctx.createStereoPanner();
+    out.pan.value = pan;
+    out.connect(this.engineBus!);
+
+    const roarLp = ctx.createBiquadFilter();
+    roarLp.type = 'lowpass';
+    roarLp.Q.value = 0.5;
+    roarLp.frequency.value = 150;
+    const roar = ctx.createGain();
+    roar.gain.value = 0;
+    this.loop(this.pink!).connect(roarLp).connect(roar).connect(out);
+
+    // 风扇：两条窄带，基频和二次谐波
+    const fanGain = ctx.createGain();
+    fanGain.gain.value = 0;
+    fanGain.connect(out);
+    const fan = ctx.createBiquadFilter();
+    fan.type = 'bandpass';
+    fan.Q.value = 28;
+    const fan2 = ctx.createBiquadFilter();
+    fan2.type = 'bandpass';
+    fan2.Q.value = 40;
+    const fan2Gain = ctx.createGain();
+    fan2Gain.gain.value = 0.45;
+    const src = this.loop(this.white!);
+    src.connect(fan).connect(fanGain);
+    src.connect(fan2).connect(fan2Gain).connect(fanGain);
+
+    const coreLp = ctx.createBiquadFilter();
+    coreLp.type = 'lowpass';
+    coreLp.frequency.value = 95;
+    const core = ctx.createGain();
+    core.gain.value = 0;
+    this.loop(this.brown!).connect(coreLp).connect(core).connect(out);
+
+    return { roarLp, roar, fan, fan2, fanGain, core, offset, phase: Math.random() * 10 };
   }
 
   private bus(gain: number) {
@@ -141,26 +172,28 @@ export class Sound {
     return g;
   }
 
-  private noiseBuffer(ctx: AudioContext, kind: 'pink' | 'white', seconds: number) {
+  private noiseBuffer(ctx: AudioContext, kind: 'pink' | 'white' | 'brown', seconds: number) {
     const len = ctx.sampleRate * seconds;
     const buf = ctx.createBuffer(1, len, ctx.sampleRate);
     const d = buf.getChannelData(0);
-    // Paul Kellet 的粉红噪声近似
-    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+    // 粉红噪声用 Paul Kellet 的近似，棕噪声是白噪声的积分
+    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0, last = 0;
     for (let i = 0; i < len; i++) {
       const w = Math.random() * 2 - 1;
-      if (kind === 'white') {
-        d[i] = w * 0.5;
-        continue;
+      if (kind === 'white') d[i] = w * 0.5;
+      else if (kind === 'brown') {
+        last = (last + 0.02 * w) / 1.02;
+        d[i] = last * 3.5;
+      } else {
+        b0 = 0.99886 * b0 + w * 0.0555179;
+        b1 = 0.99332 * b1 + w * 0.0750759;
+        b2 = 0.969 * b2 + w * 0.153852;
+        b3 = 0.8665 * b3 + w * 0.3104856;
+        b4 = 0.55 * b4 + w * 0.5329522;
+        b5 = -0.7616 * b5 - w * 0.016898;
+        d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11;
+        b6 = w * 0.115926;
       }
-      b0 = 0.99886 * b0 + w * 0.0555179;
-      b1 = 0.99332 * b1 + w * 0.0750759;
-      b2 = 0.969 * b2 + w * 0.153852;
-      b3 = 0.8665 * b3 + w * 0.3104856;
-      b4 = 0.55 * b4 + w * 0.5329522;
-      b5 = -0.7616 * b5 - w * 0.016898;
-      d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11;
-      b6 = w * 0.115926;
     }
     return buf;
   }
@@ -174,14 +207,17 @@ export class Sound {
     return src;
   }
 
+  private async fetchAudio(url: string) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(url);
+    return this.ctx!.decodeAudioData(await res.arrayBuffer());
+  }
+
   private async loadClips() {
-    const ctx = this.ctx!;
     await Promise.all(
       CLIPS.map(async (name) => {
         try {
-          const res = await fetch(`/audio/${name}.mp3`);
-          if (!res.ok) return;
-          this.clips.set(name, await ctx.decodeAudioData(await res.arrayBuffer()));
+          this.clips.set(name, await this.fetchAudio(`/audio/${name}.mp3`));
         } catch {
           /* 少一句语音不影响别的 */
         }
@@ -189,30 +225,62 @@ export class Sound {
     );
   }
 
-  /** 每帧调用 */
-  update(n1: number, speed: number, alt: number) {
+  private async loadMusic() {
+    try {
+      this.music = await this.fetchAudio('/audio/jasmine.mp3');
+      if (this.musicOn) this.playMusic();
+    } catch {
+      /* 没有音乐也照样飞 */
+    }
+  }
+
+  private playMusic() {
+    if (!this.ctx || !this.music || !this.musicBus || this.musicSrc) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = this.music;
+    src.loop = true;
+    src.connect(this.musicBus);
+    src.start();
+    this.musicSrc = src;
+  }
+
+  /**
+   * 每帧调用。cruise 为 true 时：发动机压低，《茉莉花》淡入；离开巡航后淡出。
+   */
+  update(n1: number, speed: number, alt: number, cruise = false) {
     const ctx = this.ctx;
-    if (!ctx || !this.roar || !this.roarLp || !this.whine || !this.coreGain || !this.core || !this.wind || !this.windBp) return;
+    if (!ctx || !this.engineBus || !this.wind || !this.windBp || !this.musicBus) return;
     const t = ctx.currentTime;
     const spool = Math.max(0, Math.min(1.1, (n1 - 2) / 90)); // 0 = 停车，1 ≈ 起飞推力
-    const breathe = 1 + 0.09 * Math.sin(t * 0.73) + 0.05 * Math.sin(t * 1.91 + 1.3);
 
-    this.roar.gain.setTargetAtTime(spool * spool * 0.55 + spool * 0.12, t, 0.25);
-    this.roarLp.frequency.setTargetAtTime((160 + spool * 1250) * breathe, t, 0.3);
+    for (const e of this.engines) {
+      const s = spool * (1 + e.offset);
+      // 两路不成比例的慢速起伏，两台发动机相位不同
+      const breathe = 1 + 0.08 * Math.sin(t * 0.67 + e.phase) + 0.05 * Math.sin(t * 1.73 + e.phase * 2);
+      e.roar.gain.setTargetAtTime((s * s * 0.5 + s * 0.1) * breathe, t, 0.25);
+      e.roarLp.frequency.setTargetAtTime((150 + s * 1150) * breathe, t, 0.3);
 
-    // 啸叫：启动阶段最明显，推力上去后被轰鸣盖住
-    const fan = 180 + spool * 2300;
-    const jitter = 1 + 0.004 * Math.sin(t * 7.3) + 0.003 * Math.sin(t * 13.1);
-    this.whineOsc.forEach((o, i) => o.frequency.setTargetAtTime(fan * [1, 2.03, 3.51][i] * jitter, t, 0.35));
-    const startup = n1 < 30 ? Math.min(1, n1 / 18) : Math.max(0.35, 1 - (n1 - 30) / 80);
-    this.whine.gain.setTargetAtTime(0.045 * startup * Math.min(1, spool * 3), t, 0.3);
-
-    this.core.frequency.setTargetAtTime(32 + spool * 38, t, 0.4);
-    this.coreGain.gain.setTargetAtTime(spool * 0.09, t, 0.4);
+      // 风扇频率：启动时几百赫兹往上爬，起飞推力时到两千多
+      const fanHz = 160 + s * 2100;
+      e.fan.frequency.setTargetAtTime(fanHz, t, 0.3);
+      e.fan2.frequency.setTargetAtTime(fanHz * 2, t, 0.3);
+      // 启动阶段啸叫最突出，推力上去后退到轰鸣后面
+      const startup = n1 < 30 ? Math.min(1, n1 / 15) : Math.max(0.4, 1 - (n1 - 30) / 90);
+      e.fanGain.gain.setTargetAtTime(0.9 * startup * Math.min(1, s * 4), t, 0.3);
+      e.core.gain.setTargetAtTime(s * 0.22, t, 0.4);
+    }
 
     const v = Math.min(1, speed / 320);
-    this.wind.gain.setTargetAtTime(v * v * 0.22, t, 0.5);
+    this.wind.gain.setTargetAtTime(v * v * 0.2, t, 0.5);
     this.windBp.frequency.setTargetAtTime(380 + speed * 2.4, t, 0.5);
+
+    // 巡航：发动机压到三分之一左右，音乐淡入
+    this.engineBus.gain.setTargetAtTime(cruise ? ENGINE_LEVEL * 0.35 : ENGINE_LEVEL, t, 1.2);
+    if (cruise !== this.musicOn) {
+      this.musicOn = cruise;
+      if (cruise) this.playMusic();
+    }
+    this.musicBus.gain.setTargetAtTime(this.musicOn ? MUSIC_LEVEL : 0, t, this.musicOn ? 1.5 : 1.0);
 
     // 跑道接缝：大约每 30 米一道，地速越快越密
     if (alt < 1 && speed > 18) {
@@ -237,7 +305,7 @@ export class Sound {
     g.gain.setValueAtTime(gain, t);
     g.gain.exponentialRampToValueAtTime(0.0001, t + ms / 1000);
     src.connect(f).connect(g).connect(this.sfx!);
-    src.start(t, Math.random() * 1.5);
+    src.start(t, Math.random() * 2);
     src.stop(t + ms / 1000 + 0.02);
   }
 
