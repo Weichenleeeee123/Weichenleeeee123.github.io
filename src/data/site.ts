@@ -15,6 +15,15 @@ export const site = {
   motto: '从一个想法到真正上线，我喜欢一个人把全程跑完，但更想找到能一起跑的人。',
 };
 
+/** 个人资料：驾驶舱的执照、房间的海报都读这里 */
+export const profile = {
+  base: '南京',
+  school: '南京农业大学 · 国际经济与贸易 · 2026 级',
+  ratings: 'AI 产品 · 多智能体 · 全栈',
+  home: '广东东莞 · 祖籍江西抚州',
+  hobbies: ['模拟飞行 2020 起 · 最爱 737', '日记写了六年', '减压靠 5 公里', '杀戮尖塔'],
+};
+
 /** 首屏的数据带 */
 export const stats = [
   { value: 10, suffix: '', label: '个作品' },

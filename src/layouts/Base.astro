@@ -1,15 +1,17 @@
 ---
-import '../styles/global.css';
 import { site } from '../data/site';
 
 interface Props {
   title?: string;
   description?: string;
+  /** 内容和别的地址重复时，指回主地址 */
+  canonicalPath?: string;
+  themeColor?: string;
 }
 
-const { title, description = site.description } = Astro.props;
+const { title, description = site.description, canonicalPath, themeColor = '#03050a' } = Astro.props;
 const pageTitle = title ? `${title} · ${site.title}` : site.title;
-const canonical = new URL(Astro.url.pathname, Astro.site ?? site.url).href;
+const canonical = new URL(canonicalPath ?? Astro.url.pathname, Astro.site ?? site.url).href;
 ---
 
 <!doctype html>
@@ -17,13 +19,14 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? site.url).href;
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <slot name="head" />
     <title>{pageTitle}</title>
     <meta name="description" content={description} />
     <meta name="author" content={site.name} />
     <link rel="canonical" href={canonical} />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/avatar.jpg" />
-    <meta name="theme-color" content="#03050a" />
+    <meta name="theme-color" content={themeColor} />
     <meta property="og:type" content="website" />
     <meta property="og:title" content={pageTitle} />
     <meta property="og:description" content={description} />

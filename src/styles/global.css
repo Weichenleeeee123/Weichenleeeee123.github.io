@@ -306,6 +306,35 @@ html.hud-on .hud {
   color: var(--dim);
 }
 
+a.pill {
+  text-decoration: none;
+  color: var(--dim);
+}
+
+a.pill:hover {
+  color: var(--ink);
+}
+
+.top-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.pill {
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .callsign span {
+    display: none;
+  }
+
+  .top-actions .pill {
+    padding: 0.25rem 0.55rem;
+    letter-spacing: 0.04em;
+  }
+}
+
 @media (max-width: 700px) {
   .fma {
     display: none;

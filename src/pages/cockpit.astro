@@ -1,0 +1,9 @@
+---
+import Base from '../layouts/Base.astro';
+import Cockpit from '../components/Cockpit.astro';
+---
+
+<!-- 固定指向驾驶舱，不参与随机；内容和首页一样，所以 canonical 指回首页 -->
+<Base canonicalPath="/">
+  <Cockpit />
+</Base>
