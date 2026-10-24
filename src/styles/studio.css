@@ -1410,3 +1410,123 @@ html:not(.js) .st-pill:not(.st-fly) {
     transition-delay: 0s !important;
   }
 }
+
+/* ───── 精修：下一样、高亮、把手、声音 ───── */
+
+.p-next {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  margin-top: 2.6rem;
+  padding: 1rem 1.2rem;
+  border: 1.5px solid currentColor;
+  border-radius: 14px;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0.78;
+  transition: opacity 0.25s, transform 0.35s var(--ease), background 0.25s;
+}
+
+.p-next span {
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+.p-next b {
+  font-family: var(--serif);
+  font-size: 1.2rem;
+}
+
+.p-next:hover {
+  opacity: 1;
+  transform: translateX(6px);
+  background: rgba(127, 127, 127, 0.08);
+}
+
+.p-works .p-next,
+.p-contact .p-next {
+  color: #fff;
+}
+
+.p-about .p-next {
+  color: #fff;
+}
+
+.list .p-next,
+html:not(.js) .p-next {
+  display: none;
+}
+
+/* 从房间里点到某一本书、某一张票根时，对应那条闪一下 */
+.flash {
+  animation: flash 1.6s var(--ease);
+}
+
+@keyframes flash {
+  0%,
+  40% {
+    outline: 3px solid var(--mustard);
+    outline-offset: 4px;
+    transform: scale(1.03) rotate(0);
+  }
+  100% {
+    outline: 3px solid transparent;
+    outline-offset: 10px;
+  }
+}
+
+.st-grab {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .st-grab {
+    display: grid;
+    place-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    height: 26px;
+    margin-bottom: -26px;
+    touch-action: none;
+    cursor: grab;
+  }
+
+  .st-grab i {
+    width: 44px;
+    height: 5px;
+    border-radius: 99px;
+    background: currentColor;
+    opacity: 0.35;
+  }
+
+  .open-works .st-grab,
+  .open-contact .st-grab,
+  .open-about .st-grab {
+    color: #fff;
+  }
+
+  .list .st-grab {
+    display: none;
+  }
+
+  .st-close kbd {
+    display: none;
+  }
+
+  /* 手机顶栏放不下四个按钮：台灯在房间里点也能开关，先收起来 */
+  [data-light] {
+    display: none;
+  }
+}
+
+.st-pill[data-sound][aria-pressed='false'] {
+  opacity: 0.6;
+}
+
+.no-gl [data-sound],
+html:not(.js) [data-sound] {
+  display: none;
+}

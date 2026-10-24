@@ -47,6 +47,7 @@ const roomData = {
       <div class="st-actions">
         <button type="button" class="st-pill" data-list aria-pressed="false" title="不转房间，直接看全部内容">直接看</button>
         <button type="button" class="st-pill" data-light aria-pressed="true" title="开关台灯">台灯</button>
+        <button type="button" class="st-pill" data-sound aria-pressed="true" title="开关音效">声音 开</button>
         <a class="st-pill st-fly" href="/cockpit/" data-style-switch="cockpit" title="换一种风格：737 驾驶舱">
           <svg viewBox="-12 -12 24 24" aria-hidden="true"><path d="M0 -10 L2 -3 L10 2 L10 4 L2 2 L1.5 7 L4 9 L4 10.5 L0 9.5 L-4 10.5 L-4 9 L-1.5 7 L-2 2 L-10 4 L-10 2 L-2 -3 Z" /></svg>
           去驾驶舱
@@ -61,7 +62,7 @@ const roomData = {
       </h1>
       <p class="st-en">{site.nameEn} · {site.callsign}</p>
       <p class="st-motto">{site.motto}</p>
-      <p class="st-hint"><span class="st-hint-dot"></span>拖动转一转 · 点房间里的东西</p>
+      <p class="st-hint"><span class="st-hint-dot"></span><span data-hint>拖动转一转 · 点房间里的东西</span></p>
     </div>
 
     <nav class="st-dock" aria-label="房间里的东西">
@@ -84,6 +85,7 @@ const roomData = {
     </div>
 
     <aside class="st-drawer" data-drawer aria-label="内容">
+      <div class="st-grab" data-grab aria-hidden="true"><i></i></div>
       <button type="button" class="st-close" data-close aria-label="关上，回到房间">
         <span>回到房间</span><kbd>Esc</kbd>
       </button>
@@ -150,6 +152,10 @@ const roomData = {
             <span data-work-count>01 / {String(projects.length).padStart(2, '0')}</span>
             <button type="button" data-work-step="1" aria-label="下一个">→</button>
           </div>
+          <button type="button" class="p-next" data-open={spots[1].id}>
+            <span>下一样 · {spots[1].thing}</span>
+            <b>{spots[1].label} →</b>
+          </button>
         </section>
 
         <!-- ───── 软木板 · 经历 ───── -->
@@ -171,6 +177,10 @@ const roomData = {
               ))
             }
           </ol>
+          <button type="button" class="p-next" data-open={spots[2].id}>
+            <span>下一样 · {spots[2].thing}</span>
+            <b>{spots[2].label} →</b>
+          </button>
         </section>
 
         <!-- ───── 书架 · 小玩意 ───── -->
@@ -189,6 +199,10 @@ const roomData = {
               ))
             }
           </ul>
+          <button type="button" class="p-next" data-open={spots[3].id}>
+            <span>下一样 · {spots[3].thing}</span>
+            <b>{spots[3].label} →</b>
+          </button>
         </section>
 
         <!-- ───── 白板 · 技能 ───── -->
@@ -219,6 +233,10 @@ const roomData = {
               ))
             }
           </ul>
+          <button type="button" class="p-next" data-open={spots[4].id}>
+            <span>下一样 · {spots[4].thing}</span>
+            <b>{spots[4].label} →</b>
+          </button>
         </section>
 
         <!-- ───── 海报 · 关于我 ───── -->
@@ -238,6 +256,10 @@ const roomData = {
               {profile.hobbies.map((h) => <li>{h}</li>)}
             </ul>
           </div>
+          <button type="button" class="p-next" data-open={spots[5].id}>
+            <span>下一样 · {spots[5].thing}</span>
+            <b>{spots[5].label} →</b>
+          </button>
         </section>
 
         <!-- ───── 手机 · 联系 ───── -->
@@ -265,6 +287,10 @@ const roomData = {
               ))
             }
           </ul>
+          <button type="button" class="p-next" data-open={spots[0].id}>
+            <span>下一样 · {spots[0].thing}</span>
+            <b>{spots[0].label} →</b>
+          </button>
         </section>
 
         <footer class="doc-foot">

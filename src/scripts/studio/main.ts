@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { Room, type RoomData, type Spot, type Thing } from './room';
+import { Sfx } from './sfx';
 
 const $ = <T extends Element = HTMLElement>(s: string) => document.querySelector<T>(s)!;
 const $$ = <T extends Element = HTMLElement>(s: string) => [...document.querySelectorAll<T>(s)];
@@ -23,6 +24,18 @@ const TIPS: Record<Thing, string> = {
   plane: '737 模型 · 起飞去驾驶舱',
 };
 const QUACKS = ['嘎？', '头好痛……', '嘎嘎！', '这是我的房间', '别光看我，去看看作品', '我是机长（不是）', '再戳要生气了'];
+
+const sfx = new Sfx();
+const soundBtn = $('[data-sound]');
+const paintSound = () => {
+  soundBtn.setAttribute('aria-pressed', String(sfx.on));
+  soundBtn.textContent = sfx.on ? '声音 开' : '声音 关';
+};
+paintSound();
+soundBtn.addEventListener('click', () => {
+  sfx.toggle();
+  paintSound();
+});
 
 /* ───────────── 没有 WebGL 就退成普通网页 ───────────── */
 
@@ -58,6 +71,7 @@ function wireDoc() {
     tabs.forEach((t, k) => t.setAttribute('aria-selected', String(k === workIndex)));
     tabs[workIndex].scrollIntoView({ block: 'nearest', inline: 'center', behavior: reduce ? 'auto' : 'smooth' });
     count.textContent = `${String(workIndex + 1).padStart(2, '0')} / ${total}`;
+    sfx.tick(1.5);
     onWork(workIndex);
   };
   tabs.forEach((t, i) => t.addEventListener('click', () => show(i)));
@@ -86,14 +100,15 @@ function start(renderer: THREE.WebGLRenderer) {
 
   const hour = new Date().getHours();
   let night = hour < 6 || hour >= 18;
-  const applySky = () => {
-    room.setTime(night);
+  const applySky = (instant = false) => {
+    room.setTime(night, room.lampOn, instant);
     root.dataset.sky = night ? 'night' : 'day';
     $('[data-sky-label]').textContent = night ? '夜里' : '白天';
     $('[data-light]').setAttribute('aria-pressed', String(room.lampOn));
   };
-  applySky();
+  applySky(true);
   room.loadImages();
+  if (coarse) $('[data-hint]').textContent = '滑动转一转 · 点房间里的东西';
 
   const showWork = wireDoc();
   onWork = (i) => room.drawScreen(i);
@@ -177,6 +192,7 @@ function start(renderer: THREE.WebGLRenderer) {
     history.replaceState(null, '', `#${spot}`);
     if (spot === 'works') room.drawScreen(workIndex);
     if (spot === 'contact') room.drawPhone(true);
+    sfx.swish(true);
     $('[data-drawer]').scrollTop = 0;
     hero.setAttribute('aria-hidden', 'true');
   };
@@ -196,20 +212,12 @@ function start(renderer: THREE.WebGLRenderer) {
     goal.phi = HOME.phi;
     setHome();
     room.drawPhone(false);
+    sfx.swish(false);
     history.replaceState(null, '', location.pathname);
     hero.removeAttribute('aria-hidden');
   };
 
-  /* 不能打开面板的小东西：只在房间里看一眼 */
-  const peek = (t: Thing) => {
-    mode = 'focus';
-    focused = t;
-    flyTo(t);
-    offXGoal = 0;
-    offYGoal = 0;
-    root.classList.add('peeking');
-    hero.setAttribute('aria-hidden', 'true');
-  };
+  /* 起飞时镜头只是「看一眼」，点空白处或按 Esc 回来 */
   const unpeek = () => {
     root.classList.remove('peeking');
     mode = 'home';
@@ -257,6 +265,7 @@ function start(renderer: THREE.WebGLRenderer) {
   let leaving = false;
   const now = () => performance.now();
 
+  /** 镜头转到书架顶和窗户，模型飞机从窗户飞出去，然后去驾驶舱 */
   const fly = () => {
     if (leaving) return;
     leaving = true;
@@ -269,33 +278,80 @@ function start(renderer: THREE.WebGLRenderer) {
       location.href = '/cockpit/';
       return;
     }
-    say('plane', '起飞！', 1600);
-    room.takeoff(now(), () => {
-      root.classList.add('leaving');
-      setTimeout(() => (location.href = '/cockpit/'), 450);
-    });
+    if (root.classList.contains('list')) setList(false);
+    if (mode === 'focus' && !root.classList.contains('peeking')) close();
+    mode = 'focus';
+    focused = 'plane';
+    root.classList.add('peeking');
+    hero.setAttribute('aria-hidden', 'true');
+    const v = room.takeoffView;
+    goal.target.copy(v.target);
+    goal.theta = v.theta;
+    goal.phi = v.phi;
+    goal.r = v.r * fitScale;
+    offXGoal = 0;
+    offYGoal = 0;
+    say('plane', '起飞！', 1500);
+    setTimeout(() => {
+      sfx.takeoff();
+      room.takeoff(now(), () => {
+        root.classList.add('leaving');
+        setTimeout(() => (location.href = '/cockpit/'), 450);
+      });
+    }, 650);
   };
 
-  const activate = (t: Thing) => {
+  /** 点到书架上某本书、软木板上某张票根：打开面板后高亮那一条 */
+  const flash = (sel: string, i: number) => {
+    const el = $$(sel)[i];
+    if (!el) return;
+    setTimeout(() => {
+      el.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
+      el.classList.remove('flash');
+      void el.offsetWidth;
+      el.classList.add('flash');
+    }, 480);
+  };
+
+  const activate = (t: Thing, hit?: THREE.Intersection) => {
     if ((SPOTS as string[]).includes(t)) {
-      if (focused === t && mode === 'focus' && !root.classList.contains('peeking')) return;
-      root.classList.remove('peeking');
-      open(t as Spot);
+      if (!(focused === t && mode === 'focus' && !root.classList.contains('peeking'))) {
+        root.classList.remove('peeking');
+        open(t as Spot);
+      }
+      const ud = hit?.object.userData;
+      if (t === 'shelf' && ud?.book !== undefined) flash('.books li', ud.book as number);
+      if (t === 'journey' && ud?.pins && hit?.uv) {
+        const uv = hit.uv;
+        let best = -1;
+        let bestD = 0.12;
+        (ud.pins as [number, number][]).forEach(([u, v], i) => {
+          const d = Math.hypot((u - uv.x) * 1.4, v - uv.y);
+          if (d < bestD) {
+            bestD = d;
+            best = i;
+          }
+        });
+        if (best >= 0) flash('.pins li', best);
+      }
       return;
     }
     switch (t) {
       case 'duck':
         room.hopDuck(now());
+        sfx.quack();
         say('duck', QUACKS[quack++ % QUACKS.length]);
         break;
       case 'lamp':
         room.setTime(night, !room.lampOn);
+        sfx.lamp();
         $('[data-light]').setAttribute('aria-pressed', String(room.lampOn));
         say('lamp', room.lampOn ? '咔哒 · 开灯' : '咔哒 · 关灯', 1400);
         break;
       case 'window':
         night = !night;
         applySky();
+        sfx.chime(night);
         say('window', night ? '天黑了' : '天亮了', 1400);
         break;
       case 'clock': {
@@ -305,9 +361,11 @@ function start(renderer: THREE.WebGLRenderer) {
       }
       case 'chair':
         room.spinChair(now());
+        sfx.spin();
         break;
       case 'plant':
         room.shakePlant(now());
+        sfx.rustle();
         break;
       case 'plane':
         if (now() - planeArmed < 3500) fly();
@@ -338,12 +396,35 @@ function start(renderer: THREE.WebGLRenderer) {
     a.addEventListener('click', (e) => {
       if (reduce || e.metaKey || e.ctrlKey || e.shiftKey) return;
       e.preventDefault();
-      if (root.classList.contains('list')) setList(false);
-      if (mode === 'focus' && !root.classList.contains('peeking')) close();
-      peek('plane');
-      setTimeout(fly, 700);
+      fly();
     }),
   );
+
+  // 手机上的底部卡片：按住顶上的把手往下拖就关上
+  const drawer = $('[data-drawer]');
+  const grab = $('[data-grab]');
+  let grabY: number | null = null;
+  let grabDy = 0;
+  grab.addEventListener('pointerdown', (e) => {
+    grabY = e.clientY;
+    grabDy = 0;
+    grab.setPointerCapture(e.pointerId);
+    drawer.style.transition = 'none';
+  });
+  grab.addEventListener('pointermove', (e) => {
+    if (grabY === null) return;
+    grabDy = Math.max(0, e.clientY - grabY);
+    drawer.style.transform = `translateY(${grabDy}px)`;
+  });
+  const release = () => {
+    if (grabY === null) return;
+    grabY = null;
+    drawer.style.transition = '';
+    drawer.style.transform = '';
+    if (grabDy > 80) close();
+  };
+  grab.addEventListener('pointerup', release);
+  grab.addEventListener('pointercancel', release);
 
   /* ───── 指针：拖动转镜头、悬停高亮、轻点 ───── */
 
@@ -354,14 +435,14 @@ function start(renderer: THREE.WebGLRenderer) {
   let vel = { t: 0, p: 0 };
   let pointer = { x: 0, y: 0 };
 
-  const pick = (x: number, y: number): THREE.Group | null => {
+  const pick = (x: number, y: number): { g: THREE.Group; hit: THREE.Intersection } | null => {
     const rect = canvas.getBoundingClientRect();
     ndc.set(((x - rect.left) / rect.width) * 2 - 1, -((y - rect.top) / rect.height) * 2 + 1);
     ray.setFromCamera(ndc, cam);
     const hit = ray.intersectObjects(room.things, true)[0];
     let o: THREE.Object3D | null = hit?.object ?? null;
     while (o && o.userData.thing === undefined) o = o.parent;
-    return (o as THREE.Group) ?? null;
+    return o ? { g: o as THREE.Group, hit } : null;
   };
 
   const setHover = (g: THREE.Group | null, x: number, y: number) => {
@@ -369,6 +450,7 @@ function start(renderer: THREE.WebGLRenderer) {
       room.highlight(hovered, false);
       room.highlight(g, true);
       hovered = g;
+      if (g) sfx.tick();
       canvas.style.cursor = g ? 'pointer' : '';
       tip.textContent = g ? TIPS[g.userData.thing as Thing] : '';
       tip.classList.toggle('on', !!g);
@@ -398,7 +480,7 @@ function start(renderer: THREE.WebGLRenderer) {
       }
       return;
     }
-    if (e.pointerType === 'mouse' && mode !== 'intro') setHover(pick(e.clientX, e.clientY), e.clientX, e.clientY);
+    if (e.pointerType === 'mouse' && mode !== 'intro') setHover(pick(e.clientX, e.clientY)?.g ?? null, e.clientX, e.clientY);
   });
   const up = (e: PointerEvent) => {
     if (!down || down.id !== e.pointerId) return;
@@ -407,8 +489,8 @@ function start(renderer: THREE.WebGLRenderer) {
     down = null;
     canvas.classList.remove('dragging');
     if (moved > 6 || !quick) return;
-    const g = pick(e.clientX, e.clientY);
-    if (g) activate(g.userData.thing as Thing);
+    const p = pick(e.clientX, e.clientY);
+    if (p) activate(p.g.userData.thing as Thing, p.hit);
     else if (root.classList.contains('peeking')) unpeek();
     else if (mode === 'focus') close();
   };
@@ -430,6 +512,12 @@ function start(renderer: THREE.WebGLRenderer) {
   );
 
   addEventListener('resize', resize);
+  // 显卡上下文丢了（比如手机切后台太久），就退成列表页
+  canvas.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault();
+    root.classList.add('no-gl');
+    setList(true);
+  });
   addEventListener('hashchange', () => {
     const h = location.hash.slice(1) as Spot;
     if (SPOTS.includes(h) && mode !== 'intro') open(h);
@@ -463,6 +551,10 @@ function start(renderer: THREE.WebGLRenderer) {
   const INTRO = reduce ? 1 : 2600;
   let last = t0;
   let opened = false;
+  let painted = false;
+  let ratio = renderer.getPixelRatio();
+  let slowSum = 0;
+  let slowN = 0;
   const wantSpot = location.hash.slice(1) as Spot;
 
   const frame = (time: number) => {
@@ -524,6 +616,25 @@ function start(renderer: THREE.WebGLRenderer) {
 
     room.update(time, dt);
     renderer.render(room.scene, cam);
+    if (!painted) {
+      painted = true;
+      $('[data-load-bar]').style.transform = 'scaleX(1)';
+      setTimeout(() => root.classList.add('loaded'), reduce ? 0 : 250);
+    }
+
+    // 掉帧就降低清晰度：每 90 帧看一次平均帧时
+    if (mode !== 'intro' && dt < 0.1) {
+      slowSum += dt;
+      if (++slowN >= 90) {
+        if (slowSum / slowN > 0.034 && ratio > 1) {
+          ratio = Math.max(1, ratio - 0.5);
+          renderer.setPixelRatio(ratio);
+          resize();
+        }
+        slowSum = 0;
+        slowN = 0;
+      }
+    }
 
     // 气泡跟着说话的东西走
     if (bubbleFor) {
@@ -536,10 +647,6 @@ function start(renderer: THREE.WebGLRenderer) {
   };
   requestAnimationFrame(frame);
 
-  // 开灯：加载条走完就淡出
-  const bar = $('[data-load-bar]');
-  bar.style.transform = 'scaleX(1)';
-  setTimeout(() => root.classList.add('loaded'), reduce ? 0 : 350);
 
   // 在别的标签页回来时不要一下子补很多帧
   document.addEventListener('visibilitychange', () => (last = performance.now()));

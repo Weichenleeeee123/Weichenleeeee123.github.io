@@ -30,6 +30,30 @@ const MONO = 'ui-monospace, "JetBrains Mono", Consolas, monospace';
 
 type V3 = [number, number, number];
 
+const C = {
+  daySky: new THREE.Color(0xfff2dc),
+  nightSky: new THREE.Color(0x5a6aa8),
+  dayGround: new THREE.Color(0x8a6a50),
+  nightGround: new THREE.Color(0x2a1e18),
+  dayKey: new THREE.Color(0xfff0d2),
+  nightKey: new THREE.Color(0x9fb4ff),
+  sun: new THREE.Color(0xffe2b0),
+  moon: new THREE.Color(0x9ab8ff),
+};
+
+/** 发光体积：越靠近光源越亮，叠加混合 */
+function glowMaterial(color: number) {
+  return new THREE.ShaderMaterial({
+    uniforms: { uColor: { value: new THREE.Color(color) }, uOpacity: { value: 0.05 } },
+    vertexShader: 'attribute float fade; varying float vF; void main(){ vF = fade; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: 'uniform vec3 uColor; uniform float uOpacity; varying float vF; void main(){ gl_FragColor = vec4(uColor * uOpacity * vF * vF, 1.0); }',
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+  });
+}
+
 const std = (color: THREE.ColorRepresentation, o: THREE.MeshStandardMaterialParameters = {}) =>
   new THREE.MeshStandardMaterial({ color, roughness: 0.82, metalness: 0, ...o });
 
@@ -115,6 +139,9 @@ function drawCover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: numb
 
 type Drop = { obj: THREE.Object3D; y: number; delay: number };
 
+/** 放在地上或桌上的东西，悬停会浮起来；挂墙上的不动 */
+const LIFT = new Set<Thing>(['works', 'lamp', 'duck', 'contact', 'plane', 'chair', 'plant']);
+
 export class Room {
   scene = new THREE.Scene();
   /** 能点的东西：射线只打这些 */
@@ -134,7 +161,19 @@ export class Room {
   private screenGlow!: THREE.PointLight;
   private screen!: ReturnType<typeof canvas>;
   private phone!: ReturnType<typeof canvas>;
-  private sky!: ReturnType<typeof canvas>;
+  private skyNight!: THREE.MeshBasicMaterial;
+  private beamMat!: THREE.ShaderMaterial;
+  private patchMat!: THREE.MeshBasicMaterial;
+  private coneMat!: THREE.ShaderMaterial;
+  private blobMats: THREE.MeshBasicMaterial[] = [];
+  /** 当前的昼夜 / 台灯混合值，一直追目标值，切换时灯光慢慢变 */
+  private look = { night: 1, lamp: 1 };
+  private lookGoal = { night: 1, lamp: 1 };
+  private introDone = false;
+  private flying = false;
+  private windowRect = { cx: 0, cy: 0, W: 0, H: 0, z: 0 };
+  /** 起飞时的镜头：能同时看到书架顶和窗户 */
+  takeoffView = { target: new THREE.Vector3(-2.9, 3.4, -2.6), theta: 0.95, phi: 1.32, r: 6.2 };
   private flyer!: THREE.Mesh;
   private covers: (HTMLImageElement | null)[] = [];
   private avatarImg: HTMLImageElement | null = null;
@@ -151,6 +190,7 @@ export class Room {
   private screenIndex = 0;
   private screenCursor = true;
 
+  private hovered: THREE.Object3D | null = null;
   lampOn = true;
   night = true;
 
@@ -176,6 +216,8 @@ export class Room {
     this.buildPlant();
     this.buildRug();
     this.buildDust();
+    this.buildWindowLight();
+    this.buildBlobs();
   }
 
   /** 图片异步加载完以后重画显示器和海报 */
@@ -210,20 +252,38 @@ export class Room {
     this.scene.add(this.key, this.key.target);
   }
 
-  setTime(night: boolean, lampOn = this.lampOn) {
+  /** 切白天黑夜、开关台灯。instant 用在第一次，不要渐变 */
+  setTime(night: boolean, lampOn = this.lampOn, instant = false) {
     this.night = night;
     this.lampOn = lampOn;
-    this.hemi.color.set(night ? 0x5a6aa8 : 0xfff2dc);
-    this.hemi.groundColor.set(night ? 0x2a1e18 : 0x8a6a50);
-    this.hemi.intensity = night ? 0.28 : 1.5;
-    this.key.color.set(night ? 0x9fb4ff : 0xfff0d2);
-    this.key.intensity = night ? 0.32 : 2.6;
-    this.scene.environmentIntensity = night ? 0.08 : 0.5;
-    this.lampSpot.intensity = lampOn ? (night ? 16 : 5) : 0;
-    this.lampFill.intensity = lampOn ? (night ? 7 : 1.5) : 0;
-    this.bulb.emissiveIntensity = lampOn ? 2.4 : 0;
-    this.screenGlow.intensity = night ? 1.6 : 0.4;
-    this.drawSky();
+    this.lookGoal = { night: night ? 1 : 0, lamp: lampOn ? 1 : 0 };
+    if (instant) {
+      this.look = { ...this.lookGoal };
+      this.applyLook();
+    }
+  }
+
+  private applyLook() {
+    const n = this.look.night;
+    const l = this.look.lamp;
+    const mix = (a: number, b: number) => a + (b - a) * n;
+    this.hemi.color.lerpColors(C.daySky, C.nightSky, n);
+    this.hemi.groundColor.lerpColors(C.dayGround, C.nightGround, n);
+    this.hemi.intensity = mix(1.5, 0.28);
+    this.key.color.lerpColors(C.dayKey, C.nightKey, n);
+    this.key.intensity = mix(2.6, 0.32);
+    this.scene.environmentIntensity = mix(0.5, 0.08);
+    this.lampSpot.intensity = l * mix(5, 16);
+    this.lampFill.intensity = l * mix(1.5, 7);
+    this.bulb.emissiveIntensity = l * 2.4;
+    this.screenGlow.intensity = mix(0.4, 1.6);
+    this.skyNight.opacity = n;
+    this.beamMat.uniforms.uColor.value.lerpColors(C.sun, C.moon, n);
+    this.beamMat.uniforms.uOpacity.value = mix(0.075, 0.05);
+    this.patchMat.color.lerpColors(C.sun, C.moon, n);
+    this.patchMat.opacity = mix(0.5, 0.24);
+    this.coneMat.uniforms.uOpacity.value = l * mix(0.015, 0.075);
+    (this.dust.material as THREE.PointsMaterial).opacity = 0.25 + l * 0.35;
   }
 
   /* ───────────── 地板、墙 ───────────── */
@@ -300,8 +360,14 @@ export class Room {
     const cx = -2.25;
     const cy = 3.0;
     const z = -3.99;
-    this.sky = canvas(512, 572);
-    m(new THREE.PlaneGeometry(W, H), new THREE.MeshBasicMaterial({ map: this.sky.tex, toneMapped: false }), g, [cx, cy, z], false);
+    const daySky = canvas(512, 572);
+    const nightSky = canvas(512, 572);
+    this.drawSky(daySky, false);
+    this.drawSky(nightSky, true);
+    m(new THREE.PlaneGeometry(W, H), new THREE.MeshBasicMaterial({ map: daySky.tex, toneMapped: false }), g, [cx, cy, z], false);
+    this.skyNight = new THREE.MeshBasicMaterial({ map: nightSky.tex, toneMapped: false, transparent: true });
+    m(new THREE.PlaneGeometry(W, H), this.skyNight, g, [cx, cy, z + 0.001], false);
+    this.windowRect = { cx, cy, W, H, z };
 
     const frame = std(0xf6f1e8, { roughness: 0.6 });
     const t = 0.09;
@@ -340,11 +406,10 @@ export class Room {
     this.anchors.window = new THREE.Vector3(cx, cy + 0.6, z + 0.2);
   }
 
-  private drawSky() {
-    const { ctx, c, tex } = this.sky;
+  private drawSky(sky: ReturnType<typeof canvas>, night: boolean) {
+    const { ctx, c, tex } = sky;
     const w = c.width;
     const h = c.height;
-    const night = this.night;
     const grad = ctx.createLinearGradient(0, 0, 0, h);
     if (night) {
       grad.addColorStop(0, '#070b22');
@@ -643,6 +708,19 @@ export class Room {
     const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.07, 16, 16), this.bulb);
     bulb.position.z = 0.12;
     shadeG.add(bulb);
+    // 夜里能看见的一束光锥
+    const coneLen = head.distanceTo(aim) - 0.05;
+    const coneGeo = new THREE.ConeGeometry(0.5, coneLen, 40, 1, true);
+    const cp = coneGeo.getAttribute('position');
+    const fade = new Float32Array(cp.count);
+    for (let i = 0; i < cp.count; i++) fade[i] = (cp.getY(i) + coneLen / 2) / coneLen;
+    coneGeo.setAttribute('fade', new THREE.BufferAttribute(fade, 1));
+    this.coneMat = glowMaterial(0xffb36b);
+    const cone = new THREE.Mesh(coneGeo, this.coneMat);
+    cone.rotation.x = -Math.PI / 2;
+    cone.position.z = coneLen / 2 + 0.1;
+    cone.raycast = () => {};
+    shadeG.add(cone);
 
     this.lampSpot = new THREE.SpotLight(0xffb36b, 9, 0, 0.85, 0.6, 2);
     this.lampSpot.position.copy(head).add(aim.clone().sub(head).normalize().multiplyScalar(0.15));
@@ -867,11 +945,15 @@ export class Room {
         const color = palette[Math.floor(r() * palette.length)];
         const side = std(color, { roughness: 0.75 });
         let spine: THREE.Material = side;
+        let bookIndex = -1;
         if (naming) {
-          spine = std(0xffffff, { map: this.spineTexture(names.shift()!, color), roughness: 0.7 });
+          const name = names.shift()!;
+          bookIndex = this.data.books.indexOf(name);
+          spine = std(0xffffff, { map: this.spineTexture(name, color), roughness: 0.7 });
           named++;
         }
         const book = m(new THREE.BoxGeometry(d, h, t), [spine, side, side, side, side, side], g, [x0 + 0.04 + d / 2, yBase + h / 2, z + t / 2]);
+        if (bookIndex >= 0) book.userData.book = bookIndex;
         if (r() > 0.88) {
           book.rotation.x = 0.12;
           book.position.y -= 0.01;
@@ -952,21 +1034,35 @@ export class Room {
     this.anchors.plane = new THREE.Vector3(sx, 4.1, sz);
   }
 
-  /** 起飞：从书架上飞出窗外 */
+  /** 起飞：从书架顶上爬升、转弯，从窗户飞出去，越飞越小 */
   takeoff(now: number, done: () => void) {
     const g = this.plane;
-    const start = g.position.clone();
-    const rot = g.rotation.y;
+    this.flying = true;
+    const p0 = g.getWorldPosition(new THREE.Vector3());
+    const p1 = new THREE.Vector3(-2.3, 4.7, -1.2);
+    const w = this.windowRect;
+    const p2 = new THREE.Vector3(w.cx + 0.2, w.cy + 0.35, w.z + 0.08);
+    const at = (k: number) => {
+      const a = (1 - k) * (1 - k);
+      const b = 2 * (1 - k) * k;
+      const c = k * k;
+      return new THREE.Vector3(p0.x * a + p1.x * b + p2.x * c, p0.y * a + p1.y * b + p2.y * c, p0.z * a + p1.z * b + p2.z * c);
+    };
+    const parent = g.parent!;
     this.animate(
       now,
-      1500,
+      1900,
       (k) => {
-        const e = k * k;
-        g.position.set(start.x + e * 1.6, start.y + e * 0.9 + Math.sin(k * Math.PI) * 0.3, start.z + e * 0.6);
-        g.rotation.set(-0.3 * k, rot + k * 0.6, -0.4 * Math.sin(k * Math.PI));
-        g.scale.setScalar(1 + e * 1.5);
+        const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+        g.position.copy(parent.worldToLocal(at(e)));
+        g.lookAt(at(Math.min(e + 0.03, 1)).add(new THREE.Vector3(0, 0, -0.001)));
+        g.rotateZ(-0.55 * Math.sin(Math.PI * Math.min(k * 1.4, 1)));
+        g.scale.setScalar(1 - 0.85 * Math.pow(e, 1.6));
       },
-      done,
+      () => {
+        g.visible = false;
+        done();
+      },
     );
   }
 
@@ -1036,7 +1132,9 @@ export class Room {
     ctx.textAlign = 'left';
     ctx.fillText('一路走过来的', 36, 60);
     cork.tex.needsUpdate = true;
-    m(new THREE.PlaneGeometry(W, H), std(0xffffff, { map: cork.tex, roughness: 0.95 }), g, [p.x, p.y, p.z + 0.052], false);
+    const corkMesh = m(new THREE.PlaneGeometry(W, H), std(0xffffff, { map: cork.tex, roughness: 0.95 }), g, [p.x, p.y, p.z + 0.052], false);
+    // 每张票根在贴图上的位置（uv），点到哪张就能高亮哪条经历
+    corkMesh.userData.pins = pts.map(([x, y]) => [x / 1024, 1 - y / 728]);
     // 3D 图钉
     const pinMat = std(0xd23b2a, { roughness: 0.3 });
     pts.forEach(([x, y]) => {
@@ -1248,6 +1346,135 @@ export class Room {
     this.scene.add(this.dust);
   }
 
+  /* ───────────── 窗户投进来的光：光束 + 地板上的窗格光斑 ───────────── */
+
+  private buildWindowLight() {
+    const { cx, cy, W, H } = this.windowRect;
+    const z0 = -3.96;
+    const dir = new THREE.Vector3(0.3, -0.78, 0.55).normalize();
+    const floorY = 0.032;
+    const proj = (v: THREE.Vector3) => v.clone().addScaledVector(dir, (v.y - floorY) / -dir.y);
+    const inset = 0.04;
+    const win = [
+      new THREE.Vector3(cx - W / 2 + inset, cy - H / 2 + inset, z0),
+      new THREE.Vector3(cx + W / 2 - inset, cy - H / 2 + inset, z0),
+      new THREE.Vector3(cx + W / 2 - inset, cy + H / 2 - inset, z0),
+      new THREE.Vector3(cx - W / 2 + inset, cy + H / 2 - inset, z0),
+    ];
+    const flo = win.map(proj);
+
+    // 光斑：窗户四个角投到地板上
+    const pg = new THREE.BufferGeometry();
+    pg.setAttribute('position', new THREE.Float32BufferAttribute(flo.flatMap((v) => [v.x, v.y, v.z]), 3));
+    pg.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 1], 2));
+    pg.setIndex([0, 2, 1, 0, 3, 2]);
+    const panes = canvas(256, 288);
+    {
+      const { ctx } = panes;
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, 256, 288);
+      ctx.filter = 'blur(4px)';
+      ctx.fillStyle = '#fff';
+      // 横档在窗户中心往上 0.25 处；画布 y 向下，所以从顶上量
+      const mid = 288 * ((H / 2 - 0.25) / H);
+      for (const [x, y, w, h] of [
+        [14, 14, 110, mid - 20],
+        [132, 14, 110, mid - 20],
+        [14, mid + 6, 110, 288 - mid - 20],
+        [132, mid + 6, 110, 288 - mid - 20],
+      ])
+        ctx.fillRect(x, y, w, h);
+      panes.tex.needsUpdate = true;
+    }
+    this.patchMat = new THREE.MeshBasicMaterial({
+      map: panes.tex,
+      color: C.sun.clone(),
+      transparent: true,
+      opacity: 0.4,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+    });
+    const patch = new THREE.Mesh(pg, this.patchMat);
+    patch.raycast = () => {};
+    this.scene.add(patch);
+
+    // 光束：窗框四条边各拉一个面到地板，靠窗亮、落地淡
+    const pos: number[] = [];
+    const fade: number[] = [];
+    for (let i = 0; i < 4; i++) {
+      const a = win[i];
+      const b = win[(i + 1) % 4];
+      const c = flo[(i + 1) % 4];
+      const d = flo[i];
+      for (const [v, f] of [
+        [a, 1],
+        [b, 1],
+        [c, 0],
+        [a, 1],
+        [c, 0],
+        [d, 0],
+      ] as [THREE.Vector3, number][]) {
+        pos.push(v.x, v.y, v.z);
+        fade.push(f);
+      }
+    }
+    const bg = new THREE.BufferGeometry();
+    bg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    bg.setAttribute('fade', new THREE.Float32BufferAttribute(fade, 1));
+    this.beamMat = glowMaterial(0xffe2b0);
+    const beam = new THREE.Mesh(bg, this.beamMat);
+    beam.raycast = () => {};
+    this.scene.add(beam);
+  }
+
+  /* ───────────── 接触阴影：东西底下一团柔和的暗 ───────────── */
+
+  private buildBlobs() {
+    const round = canvas(128, 128);
+    const rg = round.ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+    rg.addColorStop(0, 'rgba(0,0,0,1)');
+    rg.addColorStop(0.55, 'rgba(0,0,0,0.55)');
+    rg.addColorStop(1, 'rgba(0,0,0,0)');
+    round.ctx.fillStyle = rg;
+    round.ctx.fillRect(0, 0, 128, 128);
+    round.tex.needsUpdate = true;
+    const rect = canvas(256, 256);
+    rect.ctx.filter = 'blur(22px)';
+    rect.ctx.fillStyle = '#000';
+    rect.ctx.fillRect(40, 40, 176, 176);
+    rect.tex.needsUpdate = true;
+    const base = this.lite ? 0.55 : 0.32;
+    const mat = (tex: THREE.Texture, o: number) => {
+      const mm = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0, polygonOffset: true, polygonOffsetFactor: -1 });
+      mm.userData.o = o;
+      this.blobMats.push(mm);
+      return mm;
+    };
+    const roundMat = mat(round.tex, base);
+    const rectMat = mat(rect.tex, base * 0.9);
+    const smallMat = mat(round.tex, base * 1.2);
+    const plane = new THREE.PlaneGeometry(1, 1);
+    const blob = (material: THREE.Material, x: number, y: number, z: number, w: number, d: number) => {
+      const b = new THREE.Mesh(plane, material);
+      b.rotation.x = -Math.PI / 2;
+      b.position.set(x, y, z);
+      b.scale.set(w, d, 1);
+      b.raycast = () => {};
+      this.scene.add(b);
+    };
+    blob(roundMat, 0.7, 0.03, -1.85, 1.3, 1.3);
+    blob(roundMat, 3.3, 0.005, -3.3, 1.2, 1.2);
+    blob(rectMat, 0.6, 0.005, -3.2, 4.6, 2.1);
+    blob(rectMat, -3.66, 0.005, -2.05, 1.1, 2.9);
+    blob(smallMat, 1.85, 1.473, -2.82, 0.5, 0.5);
+    blob(smallMat, -1.0, 1.473, -2.85, 0.32, 0.32);
+    blob(smallMat, -0.8, 1.473, -3.4, 0.55, 0.55);
+    blob(smallMat, 0.55, 1.473, -3.52, 0.85, 0.55);
+    blob(smallMat, -0.3, 1.473, -2.82, 0.42, 0.34);
+  }
+
   /* ───────────── 动画 ───────────── */
 
   animate(now: number, dur: number, fn: (k: number) => void, done?: () => void) {
@@ -1256,6 +1483,9 @@ export class Room {
 
   /** 入场：0→1，东西从天上掉进来 */
   intro(k: number) {
+    if (this.introDone) return;
+    this.introDone = k >= 1;
+    for (const bm of this.blobMats) bm.opacity = (bm.userData.o as number) * THREE.MathUtils.clamp(k * 2.2 - 1, 0, 1);
     for (const d of this.drops) {
       const t = Math.min(Math.max((k * 2.2 - d.delay) / 0.9, 0), 1);
       const back = 1.70158;
@@ -1281,6 +1511,27 @@ export class Room {
       }
     }
     const t = now / 1000;
+    // 灯光朝目标慢慢变
+    const lk = 1 - Math.exp(-dt * 2.4);
+    const dn = this.lookGoal.night - this.look.night;
+    const dl = this.lookGoal.lamp - this.look.lamp;
+    if (Math.abs(dn) > 1e-3 || Math.abs(dl) > 1e-3) {
+      this.look.night += dn * lk;
+      this.look.lamp += dl * Math.min(1, lk * 3);
+      this.applyLook();
+    }
+    // 悬停时轻轻浮起来
+    if (this.introDone) {
+      const fk = 1 - Math.exp(-dt * 10);
+      for (const g of this.things) {
+        if (!LIFT.has(g.userData.thing)) continue;
+        const goal = g === this.hovered ? 1 : 0;
+        const cur = (g.userData.lift as number) ?? 0;
+        const next = cur + (goal - cur) * fk;
+        g.userData.lift = next;
+        g.position.y = next * 0.07;
+      }
+    }
     // 钟
     const d = new Date();
     const s = d.getSeconds() + d.getMilliseconds() / 1000;
@@ -1295,7 +1546,7 @@ export class Room {
       l.rotation.z = b.z + Math.sin(t * 0.9 + l.userData.phase) * 0.03;
     }
     // 模型飞机轻轻晃
-    if (!this.anims.length || this.plane.scale.x === 1) {
+    if (!this.flying) {
       this.plane.rotation.z = Math.sin(t * 0.7) * 0.06;
       this.plane.position.y = 3.72 + Math.sin(t * 1.1) * 0.015;
     }
@@ -1316,7 +1567,6 @@ export class Room {
       arr[i + 2] = this.dustSeed[i + 2] + Math.cos(t * 0.11 + ph) * 0.25;
     }
     this.dust.geometry.getAttribute('position').needsUpdate = true;
-    (this.dust.material as THREE.PointsMaterial).opacity = this.lampOn ? 0.6 : 0.25;
     // 窗外飞过的飞机：25 秒一趟，航行灯一秒闪一下
     const u = this.flyer.userData;
     const fk = (t % 25) / 25;
@@ -1329,6 +1579,8 @@ export class Room {
 
   /** 悬停高亮：给这件东西的材质加一点自发光 */
   highlight(g: THREE.Object3D | null, on: boolean) {
+    if (on) this.hovered = g;
+    else if (this.hovered === g) this.hovered = null;
     if (!g) return;
     g.traverse((o) => {
       const mesh = o as THREE.Mesh;
