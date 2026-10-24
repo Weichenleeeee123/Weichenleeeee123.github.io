@@ -1,0 +1,118 @@
+---
+/**
+ * 「换个风格」：三种首页风格的小菜单。
+ * 点了哪个就记进 localStorage（style-pref.ts），下次打开首页直接是这一种。
+ * 外观由各页自己定：summaryClass 给按钮套上本页的样式，弹层颜色用 --sm-* 变量改。
+ */
+interface Props {
+  current: 'cockpit' | 'studio' | 'spire';
+  label?: string;
+  summaryClass?: string;
+  class?: string;
+}
+
+const { current, label = '换个风格', summaryClass, class: cls } = Astro.props;
+
+const styles = [
+  { id: 'cockpit', href: '/cockpit/', name: '737 驾驶舱', note: '从开机到落地，飞一段夜航' },
+  { id: 'studio', href: '/studio/', name: '围城的房间', note: '一间能转着看的 3D 小屋' },
+  { id: 'spire', href: '/spire/', name: '围城爬塔', note: '一张往上爬的地图，作品是卡牌' },
+];
+---
+
+<details class:list={['style-menu', cls]} data-style-menu>
+  <summary class={summaryClass} title="换一种风格看这个网站"><slot />{label}</summary>
+  <div class="sm-pop">
+    <p class="sm-head">同一个人，三种看法</p>
+    {
+      styles.map((s) => (
+        <a href={s.href} data-style-switch={s.id} aria-current={s.id === current ? 'page' : undefined}>
+          <b>{s.name}</b>
+          <span>{s.id === current ? '正在看' : s.note}</span>
+        </a>
+      ))
+    }
+  </div>
+</details>
+
+<style is:global>
+  .style-menu {
+    position: relative;
+  }
+
+  .style-menu > summary {
+    list-style: none;
+    cursor: pointer;
+  }
+
+  .style-menu > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .sm-pop {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 8px);
+    z-index: 80;
+    width: 252px;
+    padding: 8px;
+    border-radius: var(--sm-radius, 12px);
+    background: var(--sm-bg, rgba(16, 18, 22, 0.94));
+    color: var(--sm-fg, #f2efe8);
+    border: 1px solid var(--sm-line, rgba(255, 255, 255, 0.12));
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    font-family: var(--sm-font, 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif);
+    letter-spacing: 0;
+    text-transform: none;
+    animation: sm-in 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .sm-head {
+    margin: 2px 8px 6px;
+    font-size: 11px;
+    opacity: 0.55;
+  }
+
+  .sm-pop a {
+    display: grid;
+    gap: 2px;
+    padding: 9px 10px;
+    border-radius: calc(var(--sm-radius, 12px) - 4px);
+    color: inherit;
+    text-decoration: none;
+    transition: background 0.15s;
+  }
+
+  .sm-pop a:hover,
+  .sm-pop a:focus-visible {
+    background: var(--sm-hover, rgba(255, 255, 255, 0.08));
+  }
+
+  .sm-pop a b {
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .sm-pop a span {
+    font-size: 12px;
+    opacity: 0.6;
+  }
+
+  .sm-pop a[aria-current='page'] {
+    pointer-events: none;
+  }
+
+  .sm-pop a[aria-current='page'] b::after {
+    content: ' ✓';
+    color: var(--sm-accent, #f0b44c);
+  }
+
+  @keyframes sm-in {
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+  }
+</style>

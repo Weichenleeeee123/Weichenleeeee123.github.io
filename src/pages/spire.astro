@@ -1,0 +1,802 @@
+---
+import { Image, getImage } from 'astro:assets';
+import type { ImageMetadata } from 'astro';
+import Base from '../layouts/Base.astro';
+import StyleMenu from '../components/StyleMenu.astro';
+import SpireCard from '../components/SpireCard.astro';
+import avatar from '../assets/avatar.jpg';
+import { site, profile, stats, projects, alternates, checklist, radio } from '../data/site';
+import { kinds, cards, floors, campfire, relicIcons, potionColors, type Kind } from '../data/spire';
+import '../styles/spire.css';
+
+/* ───── 地图：编译时一次排好，访客每次看到的都是同一张 ───── */
+function rng(seed: number) {
+  return () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const W = 760;
+const LANES = 7;
+const STEP = 128;
+const steps = floors.length - 1; // 不算 Boss
+const BOSS_Y = 168;
+const TOP_Y = BOSS_Y + 236;
+const H = TOP_Y + (steps - 1) * STEP + 140;
+const laneX = (l: number) => 152 + l * 84;
+const floorY = (f: number) => TOP_Y + (steps - 1 - f) * STEP;
+
+const R = rng(20260724);
+/* 真实走过的那条路：在中间几道上左右摆，不连着直走三层 */
+const real: number[] = [3];
+for (let f = 1; f < steps; f++) {
+  const prev = real[f - 1];
+  const straight = f >= 2 && real[f - 1] === real[f - 2];
+  const opts = [-1, 0, 1].filter((d) => prev + d >= 1 && prev + d <= 5 && !(straight && d === 0));
+  real.push(prev + opts[Math.floor(R() * opts.length)]);
+}
+
+/* 没走的岔路：几条随机路线，像游戏里一样不交叉 */
+type Edge = { f: number; a: number; b: number };
+const edges: Edge[] = [];
+for (let f = 0; f < steps - 1; f++) edges.push({ f, a: real[f], b: real[f + 1] });
+const crosses = (f: number, a: number, b: number) => edges.some((e) => e.f === f && (e.a - a) * (e.b - b) < 0);
+const nodeAt = new Map<string, { f: number; lane: number }>();
+real.forEach((lane, f) => nodeAt.set(`${f}:${lane}`, { f, lane }));
+const starts = [0, 6, 1, 5, 2, 4];
+for (const start of starts) {
+  let lane = start;
+  nodeAt.set(`0:${lane}`, { f: 0, lane });
+  for (let f = 0; f < steps - 1; f++) {
+    const opts = [-1, 0, 1].sort(() => R() - 0.5).map((d) => lane + d).filter((b) => b >= 0 && b < LANES && !crosses(f, lane, b));
+    if (!opts.length) break;
+    const b = opts[0];
+    if (!edges.some((e) => e.f === f && e.a === lane && e.b === b)) edges.push({ f, a: lane, b });
+    lane = b;
+    nodeAt.set(`${f + 1}:${lane}`, { f: f + 1, lane });
+  }
+}
+
+/* 岔路上的节点随便给个类型，淡淡地画 */
+const ghostKind = (f: number): Kind => {
+  if (f === steps - 1) return 'rest';
+  const r = R();
+  if (f === 0) return r < 0.8 ? 'enemy' : 'event';
+  if (r < 0.42) return 'enemy';
+  if (r < 0.66) return 'event';
+  if (r < 0.76 && f > 3) return 'elite';
+  if (r < 0.86 && f > 4) return 'rest';
+  if (r < 0.93) return 'shop';
+  return 'treasure';
+};
+const jitter = new Map<string, [number, number]>();
+const pos = (f: number, lane: number): [number, number] => {
+  const k = `${f}:${lane}`;
+  if (!jitter.has(k)) jitter.set(k, [(R() - 0.5) * 30, (R() - 0.5) * 26]);
+  const [jx, jy] = jitter.get(k)!;
+  return [Math.round(laneX(lane) + jx), Math.round(floorY(f) + jy)];
+};
+
+/* 手画的圈：看过的那一层会被圈起来 */
+const ring = (seed: number) => {
+  const r = rng(seed);
+  const a0 = r() * Math.PI * 2;
+  const n = 30;
+  const pts: string[] = [];
+  for (let i = 0; i <= n; i++) {
+    const a = a0 + (i / n) * Math.PI * 2 * 1.1;
+    const rad = 35 + (r() - 0.5) * 3 + (i / n) * 4;
+    pts.push(`${(Math.cos(a) * rad).toFixed(1)} ${(Math.sin(a) * rad * 0.9).toFixed(1)}`);
+  }
+  return `M${pts.join('L')}`;
+};
+
+const nodes = [...nodeAt.values()]
+  .map(({ f, lane }) => {
+    const isReal = real[f] === lane;
+    const [x, y] = pos(f, lane);
+    return { f, lane, x, y, real: isReal, kind: isReal ? floors[f].kind : ghostKind(f) };
+  })
+  .sort((a, b) => Number(a.real) - Number(b.real));
+const realNodes = real.map((lane, f) => pos(f, lane));
+const BOSS: [number, number] = [W / 2 + 28, BOSS_Y];
+
+const line = (p: [number, number], q: [number, number], cutA: number, cutB: number) => {
+  const dx = q[0] - p[0];
+  const dy = q[1] - p[1];
+  const len = Math.hypot(dx, dy);
+  const ux = dx / len;
+  const uy = dy / len;
+  return { x1: +(p[0] + ux * cutA).toFixed(1), y1: +(p[1] + uy * cutA).toFixed(1), x2: +(q[0] - ux * cutB).toFixed(1), y2: +(q[1] - uy * cutB).toFixed(1) };
+};
+const isRealEdge = (e: Edge) => real[e.f] === e.a && real[e.f + 1] === e.b;
+const ghostLines = edges.filter((e) => !isRealEdge(e)).map((e) => line(pos(e.f, e.a), pos(e.f + 1, e.b), 30, 30));
+const topLanes = [...nodeAt.values()].filter((n) => n.f === steps - 1);
+for (const n of topLanes) if (n.lane !== real[steps - 1]) ghostLines.push(line(pos(n.f, n.lane), BOSS, 30, 78));
+const realLines = real.slice(1).map((_, i) => line(realNodes[i], realNodes[i + 1], 30, 30));
+realLines.push(line(realNodes[steps - 1], BOSS, 30, 78));
+
+/* ───── 卡牌、头像 ───── */
+const small = async (img: ImageMetadata | undefined, width: number) => (img ? (await getImage({ src: img, width, format: 'webp' })).src : '');
+const arts = Object.fromEntries(await Promise.all(projects.map(async (p) => [p.code, await small(p.image, 520)] as const)));
+const tokenSrc = await small(avatar, 96);
+const byCode = Object.fromEntries(projects.map((p) => [p.code, p]));
+const floorOf = Object.fromEntries(floors.map((f, i) => [f.code ?? `_${i}`, i]));
+const rarityName = { common: '普通', uncommon: '罕见', rare: '稀有' };
+const seenTotal = floors.length;
+
+/* 节点图标：64×64，墨水画 */
+const icon: Record<Kind, string> = {
+  enemy: 'i-enemy',
+  elite: 'i-elite',
+  event: 'i-event',
+  rest: 'i-rest',
+  shop: 'i-shop',
+  treasure: 'i-treasure',
+  boss: 'i-boss',
+};
+
+const coin = '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="5.6" opacity=".55"/><path d="M12 8.6v6.8M10 10.4c.4-.9 1.2-1.3 2-1.3 1.1 0 1.9.6 1.9 1.4 0 1.9-3.8 1.1-3.8 3 0 .8.8 1.4 1.9 1.4.8 0 1.6-.4 2-1.2"/>';
+const trophy = '<path d="M7.5 4h9v5a4.5 4.5 0 0 1-9 0z"/><path d="M7.5 6H4.5c0 3 1.4 4.6 3.4 4.8M16.5 6h3c0 3-1.4 4.6-3.4 4.8M12 13.5V17M8.5 20.5h7l-1-3.5h-5z"/>';
+const cardIc = '<rect x="6" y="3.5" width="12" height="17" rx="1.8"/><path d="M9 8h6M9 15.5h6M12 10.5l1.4 1.5-1.4 1.5-1.4-1.5z"/>';
+const potion = (color: string) =>
+  `<path class="glass" d="M9.5 2.5h5v3.2l-.8.8v3.6c3.6 1.3 6.3 4.4 6.3 8.4a8 8 0 0 1-16 0c0-4 2.7-7.1 6.3-8.4V6.5l-.8-.8z"/><path d="M4.6 18.2c3.4-1.6 11.4 1.4 14.8 0a7.4 7.4 0 0 1-14.8 0z" fill="${color}"/><path d="M8 13.4c-1.5 1-2.3 2.4-2.4 3.8" class="hl"/>`;
+const potionIcons = radio.map((_, i) => potion(potionColors[i] ?? '#ccc'));
+---
+
+<Base title="围城爬塔" themeColor="#14171c" description="李伟宸（围城）的个人网站：一张往上爬的地图，每一层是一段经历，每张卡牌是一个作品。">
+  <link slot="head" rel="preload" href="/fonts/wc-serif-spire.woff2" as="font" type="font/woff2" crossorigin />
+  <link slot="head" rel="preload" href="/fonts/wc-hand-spire.woff2" as="font" type="font/woff2" crossorigin />
+
+  <div class="spire" data-spire>
+    <canvas class="embers" data-embers aria-hidden="true"></canvas>
+
+    <!-- ───── 顶栏：名字、金币、楼层、药水（联系方式）、牌组 ───── -->
+    <header class="sp-top">
+      <a class="sp-who" href="#hero" title="角色档案">
+        <Image src={avatar} alt="" width={64} height={64} class="sp-face" />
+        <span class="sp-name"><b>{site.callsign}</b><i>{site.name}</i></span>
+      </a>
+      <span class="sp-stat sp-gold" data-tip="金币 10000：影剧师的奖金，全部成了 KinoLens 的启动资金">
+        <svg viewBox="0 0 24 24" aria-hidden="true" set:html={coin} /><b data-gold>10000</b>
+      </span>
+      <span class="sp-stat sp-floor" data-tip="这张地图你看过几层">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 18 8v13.5H6V8zM9.5 21.5v-5h5v5M10 11h4" /></svg>
+        <b><span data-seen>0</span>/{seenTotal}</b>
+      </span>
+      <ul class="sp-potions" aria-label="药水：联系方式">
+        {
+          radio.map((r, i) => (
+            <li>
+              {r.href ? (
+                <a href={r.href} target={r.href.startsWith('http') ? '_blank' : undefined} rel="noopener" data-tip={`药水 · ${r.label}：${r.value}`} aria-label={`${r.label}：${r.value}`}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true" set:html={potionIcons[i]} />
+                </a>
+              ) : (
+                <button type="button" data-copy={r.value} data-tip={`药水 · ${r.label}：${r.value}（点一下复制）`} aria-label={`${r.label}：${r.value}，点击复制`}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true" set:html={potionIcons[i]} />
+                </button>
+              )}
+            </li>
+          ))
+        }
+      </ul>
+      <nav class="sp-actions">
+        <a class="sp-btn" href="#map" data-tip="地图" aria-label="地图">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 6.5 9 4l6 2.5L20.5 4v13.5L15 20l-6-2.5-5.5 2.5zM9 4v13.5M15 6.5V20" /></svg>
+        </a>
+        <a class="sp-btn sp-deck" href="#deck" data-tip="牌组：全部作品" aria-label="牌组：全部作品">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3.5" width="12" height="16" rx="1.8" /><path d="M5 6.5v12a2 2 0 0 0 2 2h9" /></svg>
+          <em>{projects.length}</em>
+        </a>
+        <button type="button" class="sp-btn" data-sound aria-pressed="true" data-tip="声音" aria-label="声音">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" /><path class="wave" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" /><path class="mute" d="m16 9.5 5 5m0-5-5 5" /></svg>
+        </button>
+        <StyleMenu current="spire" summaryClass="sp-btn sp-style" label="换风格" />
+      </nav>
+    </header>
+
+    <!-- 遗物 = 技能 -->
+    <ul class="sp-relics" aria-label="遗物：技能">
+      {
+        checklist.map((c, i) => (
+          <li tabindex="0" data-tip={`遗物 · ${c.item}${c.state !== 'CHECKED' ? '：' + c.state : ''}`} style={`--i:${i}`}>
+            <svg viewBox="0 0 24 24" aria-hidden="true" set:html={relicIcons[i]} />
+            <span class="sr">{c.item}</span>
+          </li>
+        ))
+      }
+    </ul>
+
+    <!-- ───── 角色档案：一打开先看到的就是这个 ───── -->
+    <section class="hero" id="hero" data-hero aria-labelledby="hero-name">
+      <div class="hero-in">
+        <div class="hero-text">
+          <p class="hero-kicker">选择你的角色<span>· 只有一个</span></p>
+          <h1 class="hero-name" id="hero-name">
+            {[...site.name].map((c, i) => <span style={`--i:${i}`}>{c}</span>)}
+          </h1>
+          <p class="hero-en">{site.callsign} · {site.nameEn}</p>
+          <ul class="hero-stats">
+            <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.4 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z" /></svg>生命 <b>6/6</b><small>日记写了六年</small></li>
+            <li><svg viewBox="0 0 24 24" aria-hidden="true" set:html={coin} />金币 <b>10000</b><small>第一笔奖金</small></li>
+          </ul>
+          <p class="hero-motto">{site.motto}</p>
+          <dl class="hero-facts">
+            <dt>现在</dt><dd>{profile.school}</dd>
+            <dt>在做</dt><dd>{profile.ratings}</dd>
+            <dt>老家</dt><dd>{profile.home}</dd>
+          </dl>
+          <div class="hero-relic">
+            <span class="hr-ic" aria-hidden="true">
+              <svg viewBox="-12 -12 24 24"><path d="M0 -10 L2 -3 L10 2 L10 4 L2 2 L1.5 7 L4 9 L4 10.5 L0 9.5 L-4 10.5 L-4 9 L-1.5 7 L-2 2 L-10 4 L-10 2 L-2 -3 Z" /></svg>
+            </span>
+            <p><b>初始遗物 · 737 模型</b>模拟飞行 2020 年开始。<a href="/cockpit/" data-style-switch="cockpit">带着它去驾驶舱 →</a></p>
+          </div>
+        </div>
+        <div class="hero-portrait" aria-hidden="true">
+          <div class="hp-arch">
+            <Image src={avatar} alt="" width={420} height={420} class="hp-img" loading="eager" />
+            <span class="hp-glow"></span>
+          </div>
+          <p class="hp-plate">全栈鸭</p>
+        </div>
+      </div>
+      <div class="hero-go">
+        <a class="btn-ghost" href="#deck">先看牌组 · {projects.length} 张</a>
+        <a class="btn-embark" href="#map" data-embark><span>出发</span></a>
+      </div>
+    </section>
+
+    <!-- ───── 地图 ───── -->
+    <main class="map-wrap" id="map">
+      <div class="parchment">
+        <svg class="map" viewBox={`0 0 ${W} ${H}`} data-map role="img" aria-label="经历地图：从 2020 年的第一次模拟飞行，一层一层往上，到下一位 Boss">
+          <defs>
+            <symbol id="i-enemy" viewBox="-32 -32 64 64">
+              <path d="M-19 15c-5-9-6-21 0-29 5-7 12-9 19-9s14 2 19 9c6 8 5 20 0 29l-6-5-5 6-4-6-4 6-4-6-4 6-5-6z" />
+              <circle cx="-8" cy="-3" r="4.6" class="hole" /><circle cx="8" cy="-3" r="4.6" class="hole" />
+              <circle cx="-7" cy="-2" r="1.9" /><circle cx="9" cy="-2" r="1.9" />
+            </symbol>
+            <symbol id="i-elite" viewBox="-32 -32 64 64">
+              <path d="M-15-8c-6-4-10-11-10-20 4 6 9 9 14 10M15-8c6-4 10-11 10-20-4 6-9 9-14 10" />
+              <path d="M-17-6c0-10 8-15 17-15s17 5 17 15v9c0 10-8 17-17 17s-17-7-17-17z" />
+              <path d="M-12-2 -3 1-12 5zM12-2 3 1 12 5z" class="hole" />
+              <path d="M-7 11l3-2 4 3 4-3 3 2" class="hole-line" />
+            </symbol>
+            <symbol id="i-event" viewBox="-32 -32 64 64">
+              <path d="M-11-11c0-8 5-13 12-13s12 5 12 11c0 5-3 8-7 10-3 2-4 4-4 8v2h-7v-3c0-5 2-8 6-11 3-2 4-4 4-6 0-3-2-5-5-5s-5 2-5 7zM-5 14h8v8h-8z" />
+            </symbol>
+            <symbol id="i-rest" viewBox="-32 -32 64 64">
+              <path d="M1-26c4 8 13 13 13 24A14 14 0 0 1-14-2c0-6 3-10 6-12 0 5 2 8 5 9-2-8-1-15 4-21z" />
+              <path d="M-1 6c-3-2-5-5-4-9 2 2 4 2 5 1 0-3 2-6 4-8 1 5 4 7 4 11a5 5 0 0 1-9 5z" class="hole" />
+              <path d="M-21 15 21 25M21 15-21 25" class="log" />
+            </symbol>
+            <symbol id="i-shop" viewBox="-32 -32 64 64">
+              <path d="M-10-24h20l-5 9c13 4 20 14 20 23 0 10-11 15-25 15s-25-5-25-15c0-9 7-19 20-23z" />
+              <path d="M-7-14H7" class="hole-line" />
+              <path d="M-6 0 0 7 6 0M0 7v12M-6 10H6M-6 15H6" class="hole-line" />
+            </symbol>
+            <symbol id="i-treasure" viewBox="-32 -32 64 64">
+              <path d="M-25-4c0-12 10-17 25-17s25 5 25 17z" />
+              <path d="M-25 0h50v22h-50z" />
+              <path d="M-25-2h50M-14-20v40M14-20v40" class="hole-line" />
+              <rect x="-5" y="-6" width="10" height="12" rx="2" class="hole" />
+            </symbol>
+            <symbol id="i-boss" viewBox="-80 -80 160 160">
+              <path d="M0-74 9-58 26-69 28-50 47-55 41-37 61-33 49-18 66-8 49 2 60 17 41 21 45 40 26 36 22 55 7 43-4 60-13 43-30 54-31 35-50 39-44 21-63 16-51 1-67-9-50-19-60-34-40-37-45-56-26-50-23-69-7-57z" class="spike" />
+              <circle r="44" />
+              <path d="M-16-14c0-13 7-20 17-20s17 7 17 16c0 8-5 12-11 15-4 2-5 5-5 10v3H1v-4c0-7 3-11 8-14 4-3 6-5 6-9 0-5-3-8-8-8s-8 3-8 11zM-6 21H6v11H-6z" class="hole" />
+            </symbol>
+            <clipPath id="tok-clip"><circle r="19" /></clipPath>
+            <mask id="reveal" maskUnits="userSpaceOnUse" x="0" y="0" width={W} height={H}>
+              <rect data-reveal x="0" y="0" width={W} height={H} fill="#fff" />
+            </mask>
+            <filter id="ink" x="-5%" y="-5%" width="110%" height="110%">
+              <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7" />
+              <feDisplacementMap in="SourceGraphic" scale="2.2" />
+            </filter>
+          </defs>
+
+          <g class="doodles" aria-hidden="true">
+            <text x="34" y="78" class="act">第一幕</text>
+            <text x="36" y="108" class="act-sub">2020 — 现在</text>
+            <g transform={`translate(${W - 74} ${H - 86})`} class="compass">
+              <circle r="30" /><circle r="22" class="thin" />
+              <path d="M0-40 6-6 0 0-6-6zM0 40l6-34L0 0l-6 6z" /><path d="M-40 0-6-6 0 0-6 6zM40 0 6 6 0 0 6-6z" class="thin" />
+              <text y="-46" class="n">北</text>
+            </g>
+          </g>
+
+          <g class="dates" aria-hidden="true">
+            {realNodes.map(([, y], f) => <text x="26" y={y + 6} class:list={[floors[f].kind]}>{floors[f].date}</text>)}
+            <text x="26" y={BOSS_Y + 6}>{floors[steps].date}</text>
+          </g>
+
+          <g class="paths ghost" aria-hidden="true">
+            {ghostLines.map((l) => <line {...l} />)}
+          </g>
+          <g class="paths real" mask="url(#reveal)" aria-hidden="true">
+            {realLines.map((l, i) => <line {...l} style={`--i:${i}`} />)}
+          </g>
+
+          {
+            nodes.map((n) =>
+              n.real ? (
+                <a href={`#f-${n.f}`} class:list={['node', 'real', `k-${n.kind}`]} data-node={n.f} transform={`translate(${n.x} ${n.y})`} data-tip={`${kinds[n.kind].title} · 第 ${n.f + 1} 层|${floors[n.f].label} · ${floors[n.f].date}`} aria-label={`第 ${n.f + 1} 层 · ${kinds[n.kind].title} · ${floors[n.f].label}`}>
+                  <circle class="hit" r="40" />
+                  <path class="ring" d={ring(n.f * 97 + 13)} pathLength="1" />
+                  <g class="ic"><use href={`#${icon[n.kind]}`} x="-27" y="-27" width="54" height="54" /></g>
+                  <text class="label" y="52">{floors[n.f].label}</text>
+                </a>
+              ) : (
+                <g class:list={['node', 'ghost', `k-${n.kind}`]} data-ghost transform={`translate(${n.x} ${n.y})`} aria-hidden="true">
+                  <circle class="hit" r="30" />
+                  <g class="ic"><use href={`#${icon[n.kind]}`} x="-22" y="-22" width="44" height="44" /></g>
+                </g>
+              ),
+            )
+          }
+
+          <a href={`#f-${steps}`} class="node real k-boss" data-node={steps} transform={`translate(${BOSS[0]} ${BOSS[1]})`} data-tip="Boss · 最后一层|还没出现。点开看看是谁" aria-label="Boss · 下一位 Boss">
+            <circle class="hit" r="80" />
+            <path class="ring" d={ring(4242).replace(/-?\d+(\.\d+)?/g, (v) => (+v * 2.3).toFixed(1))} pathLength="1" />
+            <g class="ic"><use href="#i-boss" x="-70" y="-70" width="140" height="140" /></g>
+            <text class="label boss-label" y="98">{floors[steps].label}</text>
+          </a>
+
+          <g class="token" data-token transform={`translate(${realNodes[steps - 1][0]} ${realNodes[steps - 1][1]})`} aria-hidden="true">
+            <g class="tok-hop">
+              <g transform="translate(0 -56)">
+                <circle r="22" class="tok-rim" />
+                <image href={tokenSrc} x="-19" y="-19" width="38" height="38" clip-path="url(#tok-clip)" />
+                <path d="M-6 21 0 30 6 21" class="tok-rim" />
+              </g>
+            </g>
+          </g>
+        </svg>
+      </div>
+
+      <aside class="legend" aria-label="图例">
+        <p class="lg-title">图例</p>
+        <ul>
+          {
+            (['event', 'shop', 'treasure', 'rest', 'enemy', 'elite'] as Kind[]).map((k) => (
+              <li>
+                <button type="button" data-legend={k}>
+                  <svg viewBox="-32 -32 64 64" aria-hidden="true"><use href={`#${icon[k]}`} x="-28" y="-28" width="56" height="56" /></svg>
+                  <span><b>{kinds[k].title}</b><small>{kinds[k].tip}</small></span>
+                </button>
+              </li>
+            ))
+          }
+        </ul>
+        <p class="lg-note">墨线是真走过的路，<br />淡的是没走的岔路。</p>
+      </aside>
+
+      <p class="map-hint" data-map-hint>点地图上任意一层 · 也可以直接看<a href="#deck">牌组</a></p>
+    </main>
+
+    <!-- ───── 每一层点开的画面 ───── -->
+    <div class="screens" data-screens>
+      {
+        floors.map((f, i) => {
+          const next = i < steps ? `#f-${i + 1}` : '';
+          const nav = (
+            <nav class="sc-nav">
+              <a class="sc-back" href="#map" data-back>
+                <span>回到地图</span>
+              </a>
+              {next && (
+                <a class="sc-next" href={next}>
+                  <span>继续往上</span>
+                </a>
+              )}
+            </nav>
+          );
+
+          if (f.kind === 'enemy' || f.kind === 'elite') {
+            const p = byCode[f.code!];
+            const meta = cards[f.code!];
+            const relic = p.award ?? (f.kind === 'elite' ? p.sub : '');
+            return (
+              <section class:list={['scr', 'scr-fight', `k-${f.kind}`]} id={`f-${i}`} data-floor={i} aria-label={`第 ${i + 1} 层：${p.name}`}>
+                <div class="sc-in">
+                  <header class="sc-head">
+                    <p class="ribbon">{f.kind === 'elite' ? '精英击败' : '战斗胜利'}</p>
+                    <p class="sc-foe">
+                      击败了「{meta.foe}」<span>第 {i + 1} 层 · {p.when}</span>
+                    </p>
+                  </header>
+                  <div class="fight">
+                    <div class="flip" data-flip>
+                      <div class="flip-in">
+                        <div class="card-back" aria-hidden="true">
+                          <span>围</span>
+                        </div>
+                        <SpireCard project={p} meta={meta} art={arts[p.code]} />
+                      </div>
+                    </div>
+                    <div class="loot">
+                      <ul class="rewards" aria-label="奖励">
+                        {f.gold && (
+                          <li class="rw rw-gold">
+                            <svg viewBox="0 0 24 24" aria-hidden="true" set:html={coin} />
+                            <span>
+                              <b>{f.gold.amount} 金币</b>
+                              <small>{f.gold.note}</small>
+                            </span>
+                          </li>
+                        )}
+                        {relic && (
+                          <li class="rw rw-relic">
+                            <svg viewBox="0 0 24 24" aria-hidden="true" set:html={trophy} />
+                            <span>
+                              <b>{relic}</b>
+                              <small>遗物</small>
+                            </span>
+                          </li>
+                        )}
+                        <li class="rw rw-card">
+                          <svg viewBox="0 0 24 24" aria-hidden="true" set:html={cardIc} />
+                          <span>
+                            <b>卡牌 · {p.name}</b>
+                            <small>
+                              {meta.type} · {rarityName[meta.rarity]} · 已在牌组里
+                            </small>
+                          </span>
+                        </li>
+                      </ul>
+                      <h3 class="lt-name">{p.name}</h3>
+                      <p class="lt-sub">{p.sub}</p>
+                      <p class="lt-desc">{p.desc}</p>
+                      <p class="lt-stack">
+                        {p.stack}
+                        {p.role && <span> · {p.role}</span>}
+                      </p>
+                      {p.links.length > 0 && (
+                        <p class="lt-links">
+                          {p.links.map((l) => (
+                            <a href={l.href} target="_blank" rel="noopener">
+                              {l.text} ↗
+                            </a>
+                          ))}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                {nav}
+              </section>
+            );
+          }
+
+          if (f.kind === 'event') {
+            return (
+              <section class="scr scr-event" id={`f-${i}`} data-floor={i} aria-label={`第 ${i + 1} 层：${f.title}`}>
+                <div class="sc-in ev">
+                  <div class:list={['ev-art', `art-${f.art}`]} aria-hidden="true">
+                    {f.art === 'plane' && (
+                      <svg viewBox="0 0 320 240">
+                        <circle cx="250" cy="56" r="20" class="moon" />
+                        {Array.from({ length: 26 }, (_, k) => (
+                          <circle cx={(k * 73) % 320} cy={(k * 41) % 130} r={k % 3 ? 0.9 : 1.6} class="star" />
+                        ))}
+                        <g transform="translate(150 120) rotate(-11)">
+                        <g class="plane">
+                          <path d="M-100 8c8-10 30-13 56-13l116-5c20 0 30 4 34 10-4 6-14 10-34 10l-116 4c-26 0-48-2-56-6z" />
+                          <path d="M-14 6-48 46h18l56-36zM-14 -2-30-26h12l26 22z" />
+                          <path d="M-86 0-104-36h14l28 34z" />
+                          <ellipse cx="-12" cy="22" rx="16" ry="6" />
+                          <path d="M60-3h40" class="win" />
+                        </g>
+                        </g>
+                        {Array.from({ length: 9 }, (_, k) => (
+                          <>
+                            <circle cx={160 - k * (14 + k * 3)} cy={200 + k * 4} r={1.6 + k * 0.4} class="rwy" />
+                            <circle cx={170 + k * (14 + k * 3)} cy={200 + k * 4} r={1.6 + k * 0.4} class="rwy" />
+                          </>
+                        ))}
+                      </svg>
+                    )}
+                    {f.art === 'grad' && (
+                      <svg viewBox="0 0 320 240">
+                        <g class="film">
+                          {Array.from({ length: 5 }, (_, k) => (
+                            <rect x={20 + k * 58} y="168" width="50" height="38" rx="3" />
+                          ))}
+                          <path d="M8 160h304M8 214h304" />
+                        </g>
+                        <path d="M160 52 252 88 160 124 68 88z" class="cap" />
+                        <path d="M114 106v28c28 18 64 18 92 0v-28" class="cap-band" />
+                        <path d="M160 88 236 100v40" class="tassel" />
+                        <circle cx="236" cy="146" r="6" class="tassel-end" />
+                        {Array.from({ length: 14 }, (_, k) => (
+                          <circle cx={(k * 89) % 320} cy={(k * 37) % 40 + 8} r={k % 4 ? 1 : 1.8} class="star" />
+                        ))}
+                      </svg>
+                    )}
+                    {f.art === 'wheat' && (
+                      <svg viewBox="0 0 320 240">
+                        <path d="M40 214c60-14 180-14 240 0" class="ground" />
+                        {[-1, 0, 1].map((s) => (
+                          <g transform={`translate(${160 + s * 52} 214) rotate(${s * 12})`}><g class="wheat">
+                            <path d="M0 0V-150" />
+                            {Array.from({ length: 7 }, (_, k) => (
+                              <>
+                                <ellipse cx="-8" cy={-96 - k * 9} rx="5" ry="10" transform={`rotate(-28 -8 ${-96 - k * 9})`} />
+                                <ellipse cx="8" cy={-100 - k * 9} rx="5" ry="10" transform={`rotate(28 8 ${-100 - k * 9})`} />
+                              </>
+                            ))}
+                            <path d="M0-60c-14-6-24-18-28-34M0-40c14-6 22-16 26-30" class="leaf" />
+                          </g></g>
+                        ))}
+                        <circle cx="62" cy="58" r="16" class="moon" />
+                      </svg>
+                    )}
+                  </div>
+                  <div class="ev-body">
+                    <p class="ev-kicker">
+                      未知 · {f.date} · 第 {i + 1} 层
+                    </p>
+                    <h3 class="ev-title">{f.title}</h3>
+                    <div class="ev-text">
+                      {f.body!.map((t) => (
+                        <p>{t}</p>
+                      ))}
+                    </div>
+                    <p class="ev-result" data-result hidden />
+                    <div class="ev-choices" data-choices>
+                      {f.choices!.map((c) =>
+                        c.href ? (
+                          <a class="choice" href={c.href} data-style-switch={c.style}>
+                            <b>{c.pick}</b> {c.text}
+                          </a>
+                        ) : (
+                          <button type="button" class="choice" data-pick={c.result}>
+                            <b>{c.pick}</b> {c.text}
+                          </button>
+                        ),
+                      )}
+                      <a class="choice choice-go" href={next}>
+                        <b>[继续]</b> 往上爬。
+                      </a>
+                    </div>
+                  </div>
+                </div>
+                {nav}
+              </section>
+            );
+          }
+
+          if (f.kind === 'rest') {
+            return (
+              <section class="scr scr-rest" id={`f-${i}`} data-floor={i} aria-label={`第 ${i + 1} 层：篝火`}>
+                <div class="sc-in rest">
+                  <header class="sc-head">
+                    <p class="ribbon">篝火</p>
+                  </header>
+                  <div class="fire" aria-hidden="true">
+                    <svg viewBox="-100 -130 200 170">
+                      <ellipse cy="26" rx="86" ry="12" class="fire-floor" />
+                      <g class="flames">
+                        <path class="f1" d="M0-118c22 36 58 58 58 98A58 58 0 0 1-58-20c0-24 12-40 24-50 0 20 8 32 20 36-8-32-2-60 14-84z" />
+                        <path class="f2" d="M2-80c14 24 38 40 38 66a38 38 0 0 1-76 0c0-16 8-28 16-34 0 14 6 22 14 24-6-22 0-40 8-56z" />
+                        <path class="f3" d="M0-42c8 14 20 22 20 36a20 20 0 0 1-40 0c0-9 4-15 8-18 1 8 4 12 8 13-3-12 0-22 4-31z" />
+                      </g>
+                      <path d="M-74 12 70 34M74 12-70 34" class="logs" />
+                      <path d="M-62 30 58 6" class="logs logs-2" />
+                    </svg>
+                  </div>
+                  <p class="rest-line" data-rest-line aria-live="polite">篝火噼啪作响。要做点什么？</p>
+                  <div class="rest-opts">
+                    {campfire.map((o) => {
+                      const ic = {
+                        shoe: '<path d="M3 16.5c0-3 1-6.5 2-9l4 1.5c1 2 3 3 6 3.5 3 .5 6 1.5 6 4v1.5H3z"/><path d="M3 18h18M9 10.5l2-1M11 12l2-1"/>',
+                        book: '<path d="M5 4h11a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2z"/><path d="M5 18a2 2 0 0 1 2-2h11M9 8h5"/>',
+                        card: '<rect x="6" y="3.5" width="12" height="17" rx="1.8"/><path d="M12 8.5l2.5 3.5-2.5 3.5L9.5 12z"/>',
+                        house: '<path d="M4 11 12 4l8 7v9H4z"/><path d="M10 20v-5h4v5"/>',
+                        plane: '<path d="M12 3c.9 0 1.4 1 1.4 2.2v4.3l7 4.2v1.8l-7-2.2v4.4l2 1.6v1.4l-3.4-1-3.4 1v-1.4l2-1.6v-4.4l-7 2.2v-1.8l7-4.2V5.2C10.6 4 11.1 3 12 3z"/>',
+                      }[o.icon];
+                      return o.href ? (
+                        <a class="ropt" href={o.href} data-style-switch={o.style}>
+                          <span class="ro-ic">
+                            <svg viewBox="0 0 24 24" aria-hidden="true" set:html={ic} />
+                          </span>
+                          <b>{o.title}</b>
+                          <small>{o.hint}</small>
+                        </a>
+                      ) : (
+                        <button type="button" class="ropt" data-rest={o.text}>
+                          <span class="ro-ic">
+                            <svg viewBox="0 0 24 24" aria-hidden="true" set:html={ic} />
+                          </span>
+                          <b>{o.title}</b>
+                          <small>{o.hint}</small>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p class="rest-hobbies">{profile.hobbies.join(' · ')}</p>
+                </div>
+                {nav}
+              </section>
+            );
+          }
+
+          if (f.kind === 'treasure') {
+            return (
+              <section class="scr scr-chest" id={`f-${i}`} data-floor={i} aria-label={`第 ${i + 1} 层：宝箱`}>
+                <div class="sc-in chest">
+                  <header class="sc-head">
+                    <p class="ribbon">宝箱</p>
+                    <p class="sc-foe">
+                      一路上顺手做的小玩意<span>{alternates.length} 件</span>
+                    </p>
+                  </header>
+                  <button type="button" class="chest-box" data-chest aria-label="打开宝箱">
+                    <svg viewBox="-110 -110 220 180" aria-hidden="true">
+                      <g class="rays">
+                        {Array.from({ length: 12 }, (_, k) => (
+                          <path d="M-7-20 0-108 7-20z" transform={`rotate(${k * 30 - 165})`} />
+                        ))}
+                      </g>
+                      <ellipse cy="58" rx="86" ry="10" class="chest-shadow" />
+                      <g class="chest-base">
+                        <rect x="-74" y="-12" width="148" height="68" rx="6" />
+                        <path d="M-74 4h148M-44-12v68M44-12v68" class="band" />
+                      </g>
+                      <g class="chest-lid">
+                        <path d="M-78-10c0-34 30-50 78-50s78 16 78 50z" />
+                        <path d="M-44-56v46M44-56v46M-78-14h156" class="band" />
+                        <rect x="-12" y="-24" width="24" height="28" rx="4" class="lock" />
+                      </g>
+                    </svg>
+                    <span class="chest-hint">点开宝箱</span>
+                  </button>
+                  <ul class="trinkets">
+                    {alternates.map((a, k) => (
+                      <li style={`--h:${(k * 47 + 20) % 360};--i:${k}`}>
+                        <a href={a.href} target="_blank" rel="noopener">
+                          <span class="tk-gem" aria-hidden="true" />
+                          <b>{a.name}</b>
+                          <span>{a.note}</span>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                {nav}
+              </section>
+            );
+          }
+
+          if (f.kind === 'shop') {
+            return (
+              <section class="scr scr-shop" id={`f-${i}`} data-floor={i} aria-label={`第 ${i + 1} 层：商人`}>
+                <div class="sc-in shop">
+                  <header class="sc-head">
+                    <p class="ribbon">商人</p>
+                  </header>
+                  <div class="merchant">
+                    <svg viewBox="0 0 120 140" aria-hidden="true" class="mc-fig">
+                      <path d="M60 8c26 0 40 22 40 50v70H20V58C20 30 34 8 60 8z" class="cloak" />
+                      <path d="M60 30c14 0 22 12 22 26 0 16-10 26-22 26S38 72 38 56c0-14 8-26 22-26z" class="hood" />
+                      <circle cx="52" cy="58" r="3" class="eye" />
+                      <circle cx="68" cy="58" r="3" class="eye" />
+                      <path d="M36 104c10 8 38 8 48 0" class="belt" />
+                    </svg>
+                    <p class="mc-say">「这些都不卖。想用的话，找他一起做。」</p>
+                  </div>
+                  <ul class="wares">
+                    {checklist.map((c, k) => (
+                      <li style={`--i:${k}`}>
+                        <span class="wr-ic">
+                          <svg viewBox="0 0 24 24" aria-hidden="true" set:html={relicIcons[k]} />
+                        </span>
+                        <b>{c.item}</b>
+                        {c.state !== 'CHECKED' && <small>{c.state}</small>}
+                        <span class="price">
+                          <svg viewBox="0 0 24 24" aria-hidden="true" set:html={coin} />
+                          非卖品
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <ul class="tally">
+                    {stats.map((s) => (
+                      <li>
+                        <b>
+                          {s.value}
+                          {s.suffix}
+                        </b>
+                        <span>{s.label.replace(/^个/, '')}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                {nav}
+              </section>
+            );
+          }
+
+          return (
+            <section class="scr scr-boss" id={`f-${i}`} data-floor={i} aria-label="Boss：下一位 Boss">
+              <div class="sc-in boss">
+                <svg viewBox="-80 -80 160 160" class="boss-emblem" aria-hidden="true">
+                  <use href="#i-boss" x="-80" y="-80" width="160" height="160" />
+                </svg>
+                <p class="boss-kicker">Boss · 第 {i + 1} 层 · {f.date}</p>
+                <h3 class="boss-title">{f.label}</h3>
+                <p class="boss-text">这一层的 Boss 还没出现。可能是下一个想法，可能是一起做事的人，也可能是我未来的老板。</p>
+                <ul class="boss-potions">
+                  {radio.map((r, k) => (
+                    <li>
+                      {r.href ? (
+                        <a href={r.href} target={r.href.startsWith('http') ? '_blank' : undefined} rel="noopener">
+                          <svg viewBox="0 0 24 24" aria-hidden="true" set:html={potionIcons[k]} />
+                          <b>{r.label}</b>
+                          <span>{r.value}</span>
+                        </a>
+                      ) : (
+                        <button type="button" data-copy={r.value}>
+                          <svg viewBox="0 0 24 24" aria-hidden="true" set:html={potionIcons[k]} />
+                          <b>{r.label}</b>
+                          <span>{r.value}</span>
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                <p class="boss-foot">
+                  © 2026 {site.name} · 地图、卡牌和图标都是代码画的，玩法致敬《杀戮尖塔》。
+                </p>
+              </div>
+              {nav}
+            </section>
+          );
+        })
+      }
+
+      <!-- 牌组：全部作品一眼看完 -->
+      <section class="scr scr-deck" id="deck" aria-labelledby="deck-title">
+        <div class="sc-in deck">
+          <header class="deck-head">
+            <h2 id="deck-title">牌组<span>{projects.length} 张 · 点一张去它那一层</span></h2>
+            <div class="deck-filter" role="group" aria-label="按类型看">
+              <button type="button" data-filter="" aria-pressed="true">全部</button>
+              <button type="button" data-filter="攻击" aria-pressed="false">攻击 · 比赛</button>
+              <button type="button" data-filter="技能" aria-pressed="false">技能 · 工具</button>
+              <button type="button" data-filter="能力" aria-pressed="false">能力 · 长期</button>
+            </div>
+          </header>
+          <div class="deck-grid">
+            {
+              projects.map((p, k) => (
+                <div class="deck-slot" data-type={cards[p.code].type} style={`--i:${k}`}>
+                  <SpireCard project={p} meta={cards[p.code]} art={arts[p.code]} href={`#f-${floorOf[p.code]}`} />
+                  <p class="deck-when">{p.when}</p>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+        <nav class="sc-nav">
+          <a class="sc-back" href="#map" data-back><span>回到地图</span></a>
+        </nav>
+      </section>
+    </div>
+
+    <div class="sp-tip" data-tip-box aria-hidden="true"></div>
+    <div class="sp-toast" data-toast role="status" aria-live="polite"></div>
+    <div class="sp-fade" aria-hidden="true"></div>
+  </div>
+
+  <script>
+    import '../scripts/spire/main';
+    import '../scripts/style-pref';
+  </script>
+</Base>

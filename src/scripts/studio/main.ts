@@ -430,8 +430,8 @@ function start(renderer: THREE.WebGLRenderer) {
     if (root.classList.contains('peeking')) unpeek();
     else close();
   });
-  // 顶上的「去驾驶舱」：先让模型飞机起飞
-  $$<HTMLAnchorElement>('.st-fly').forEach((a) =>
+  // 换去驾驶舱：先让模型飞机起飞
+  $$<HTMLAnchorElement>('a[data-style-switch="cockpit"]').forEach((a) =>
     a.addEventListener('click', (e) => {
       if (reduce || e.metaKey || e.ctrlKey || e.shiftKey) return;
       e.preventDefault();

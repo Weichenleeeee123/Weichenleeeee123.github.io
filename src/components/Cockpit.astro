@@ -2,6 +2,7 @@
 import { Image } from 'astro:assets';
 import '../styles/global.css';
 import avatar from '../assets/avatar.jpg';
+import StyleMenu from './StyleMenu.astro';
 import { site, profile, stats, projects, alternates, logbook, checklist, radio } from '../data/site';
 
 const nameLetters = site.nameEn.split('');
@@ -80,7 +81,7 @@ const nameLetters = site.nameEn.split('');
       <span data-fma="thr">N1</span><span data-fma="roll">HDG SEL</span><span data-fma="pitch">TO/GA</span>
     </div>
     <div class="top-actions">
-      <a class="pill" href="/studio/" data-style-switch="studio" title="换一种风格：围城的房间">换个风格</a>
+      <StyleMenu current="cockpit" summaryClass="pill" label="换个风格" />
       <button type="button" class="pill" data-sound aria-pressed="true">SOUND ON</button>
     </div>
   </header>

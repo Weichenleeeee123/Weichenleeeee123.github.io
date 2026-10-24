@@ -1,0 +1,62 @@
+---
+/**
+ * 爬塔里的一张作品卡。
+ * 卡面颜色看类型（攻击红、技能绿、能力蓝），边框和名字条看稀有度（普通灰、罕见蓝、稀有金），
+ * 插画窗的形状也跟类型走：攻击下面是尖的，技能是方的，能力是椭圆。
+ * 没有截图的作品画一个线条小图代替。
+ */
+import type { Project } from '../data/site';
+import type { CardType, Rarity } from '../data/spire';
+
+interface Props {
+  project: Project;
+  meta: { type: CardType; rarity: Rarity; cost: number; text: string };
+  art: string;
+  /** 在牌组里点开时跳到哪一层 */
+  href?: string;
+}
+
+const { project: p, meta, art, href } = Astro.props;
+const typeClass = { 攻击: 'attack', 技能: 'skill', 能力: 'power' }[meta.type];
+const rarityName = { common: '普通', uncommon: '罕见', rare: '稀有' }[meta.rarity];
+const lines = meta.text.split('\n').map((line) => line.split(/\*\*(.+?)\*\*/));
+
+/* 没截图的作品：插画窗里的线条画，viewBox 0 0 200 120 */
+const glyphs: Record<string, string> = {
+  TERMN:
+    '<rect x="38" y="22" width="124" height="78" rx="6"/><path d="M38 38h124"/><circle cx="50" cy="30" r="2.5"/><circle cx="59" cy="30" r="2.5"/><circle cx="68" cy="30" r="2.5"/><path d="M56 56l14 10-14 10M80 78h26" stroke-width="5"/><path d="M118 52h28M118 62h20M118 72h24" opacity=".5"/>',
+  VRATC:
+    '<path d="M100 104 88 52h24l-12 52M86 104h28M92 70h16M90 84h20"/><circle cx="100" cy="46" r="6"/><path d="M84 32a22 22 0 0 1 32 0M74 22a36 36 0 0 1 52 0" opacity=".7"/><path d="M146 34l16-6 4 3-12 6 2 10-3 2-5-9-9 3-2 4h-3l2-7z" fill="currentColor" stroke="none"/>',
+  YUWEN:
+    '<path d="M46 24h86l22 22v54H46z"/><path d="M132 24v22h22"/><path d="M60 50h56M60 62h70M60 74h64M60 86h40" opacity=".55"/><path d="M168 14 120 80l-6 12 12-6 48-66z" fill="currentColor" stroke-width="2"/>',
+  XRAYS:
+    '<rect x="44" y="20" width="76" height="86" rx="4"/><path d="M56 36h52M56 48h52M56 60h36M56 72h44M56 84h30" opacity=".55"/><circle cx="122" cy="66" r="24"/><path d="M139 83l22 22" stroke-width="9"/><path d="M110 60h24M110 70h16" stroke="#f0c45a"/>',
+  WCLAB:
+    '<rect x="36" y="26" width="128" height="70" rx="4"/><path d="M36 38h128M36 84h128" opacity=".7"/><path d="M48 26v12M64 26v12M80 26v12M96 26v12M112 26v12M128 26v12M144 26v12M48 84v12M64 84v12M80 84v12M96 84v12M112 84v12M128 84v12M144 84v12" opacity=".5"/><path d="M90 50l26 11-26 11z" fill="currentColor"/>',
+  COOPS:
+    '<rect x="24" y="36" width="50" height="40" rx="5"/><rect x="126" y="36" width="50" height="40" rx="5"/><path d="M34 52l8 5-8 5M136 52l8 5-8 5"/><rect x="82" y="22" width="36" height="46" rx="3"/><path d="M89 34h22M89 44h16M89 54h20" opacity=".6"/><path d="M74 56h8M118 56h8" stroke-dasharray="3 4"/><path d="M42 92h116" stroke-dasharray="2 7" opacity=".6"/>',
+};
+---
+
+<article class:list={['card', `t-${typeClass}`, `r-${meta.rarity}`]} data-card>
+  {href && <a class="card-link" href={href} aria-label={`${p.name}：去地图上的这一层`} />}
+  <div class="cd-face">
+    <span class="cd-cost" aria-label={`费用 ${meta.cost}`}>{meta.cost}</span>
+    <h4 class="cd-name">{p.name}</h4>
+    <div class="cd-art">
+      {art ? <img src={art} alt="" loading="lazy" decoding="async" /> : <svg viewBox="0 0 200 120" aria-hidden="true" set:html={glyphs[p.code] ?? ''} />}
+    </div>
+    <span class="cd-type">{meta.type}<i>· {rarityName}</i></span>
+    <p class="cd-text"><span>
+      {
+        lines.map((parts, i) => (
+          <>
+            {i > 0 && <br />}
+            {parts.map((t, j) => (j % 2 ? <b>{t}</b> : t))}
+          </>
+        ))
+      }
+    </span></p>
+    <span class="cd-shine" aria-hidden="true"></span>
+  </div>
+</article>
