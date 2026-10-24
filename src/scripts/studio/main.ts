@@ -22,6 +22,9 @@ const TIPS: Record<Thing, string> = {
   chair: '椅子 · 转一圈',
   plant: '绿植 · 摸一下',
   plane: '737 模型 · 起飞去驾驶舱',
+  diary: '日记本 · 翻开看看',
+  headset: '飞行耳机 · 碰一下',
+  shoes: '跑鞋 · 踢一下',
 };
 const QUACKS = ['嘎？', '头好痛……', '嘎嘎！', '这是我的房间', '别光看我，去看看作品', '我是机长（不是）', '再戳要生气了'];
 
@@ -54,7 +57,13 @@ if (!renderer) {
   root.classList.add('no-gl', 'list');
   wireDoc();
 } else {
-  start(renderer);
+  // 白板、软木板、海报的贴图要用到网页字体，等字体到了再画；最多等 1.5 秒
+  const gl = renderer;
+  const fonts = Promise.all([
+    document.fonts.load('900 64px "WC Serif"', data.name + data.callsign),
+    document.fonts.load('40px "WC Hand"', '出发前检查单'),
+  ]).catch(() => null);
+  Promise.race([fonts, new Promise((r) => setTimeout(r, 1500))]).then(() => start(gl));
 }
 
 /* ───────────── 面板里的交互：不依赖 3D，列表模式也能用 ───────────── */
@@ -107,6 +116,8 @@ function start(renderer: THREE.WebGLRenderer) {
     $('[data-light]').setAttribute('aria-pressed', String(room.lampOn));
   };
   applySky(true);
+  // 开场先黑着，房间落定以后台灯「咔哒」一声亮起来（加载提示写的就是「正在开灯」）
+  if (!reduce) room.setTime(night, false, true);
   room.loadImages();
   if (coarse) $('[data-hint]').textContent = '滑动转一转 · 点房间里的东西';
 
@@ -367,6 +378,21 @@ function start(renderer: THREE.WebGLRenderer) {
         room.shakePlant(now());
         sfx.rustle();
         break;
+      case 'diary':
+        room.openDiary(now());
+        sfx.swish(true);
+        say('diary', data.hobbies[1] ?? '日记', 2400);
+        break;
+      case 'headset':
+        room.swingHeadset(now());
+        sfx.tick(0.7);
+        say('headset', data.hobbies[0] ?? '模拟飞行', 2600);
+        break;
+      case 'shoes':
+        room.jogShoes(now());
+        sfx.tick(0.5);
+        say('shoes', data.hobbies[2] ?? '跑步', 2200);
+        break;
       case 'plane':
         if (now() - planeArmed < 3500) fly();
         else {
@@ -529,7 +555,7 @@ function start(renderer: THREE.WebGLRenderer) {
   const clockEl = $('[data-clock]');
   const tickClock = () => {
     const d = new Date();
-    clockEl.textContent = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    clockEl.innerHTML = `${String(d.getHours()).padStart(2, '0')}<i class="colon">:</i>${String(d.getMinutes()).padStart(2, '0')}`;
   };
   tickClock();
   setInterval(tickClock, 10_000);
@@ -576,6 +602,11 @@ function start(renderer: THREE.WebGLRenderer) {
       if (ik >= 1) {
         mode = 'home';
         root.classList.add('ready');
+        if (!room.lampOn) {
+          room.setTime(night, true);
+          sfx.lamp();
+          $('[data-light]').setAttribute('aria-pressed', 'true');
+        }
         if (!opened && SPOTS.includes(wantSpot)) {
           opened = true;
           open(wantSpot);

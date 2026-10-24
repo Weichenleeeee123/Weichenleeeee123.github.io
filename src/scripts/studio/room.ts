@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 
 export type Spot = 'works' | 'journey' | 'shelf' | 'skills' | 'about' | 'contact';
-export type Thing = Spot | 'duck' | 'lamp' | 'plane' | 'window' | 'clock' | 'chair' | 'plant';
+export type Thing = Spot | 'duck' | 'lamp' | 'plane' | 'window' | 'clock' | 'chair' | 'plant' | 'diary' | 'headset' | 'shoes';
 
 export type RoomData = {
   projects: { code: string; name: string; sub: string; when: string; award: string; image: string }[];
@@ -20,11 +20,13 @@ export type RoomData = {
   nameEn: string;
   avatar: string;
   motto: string;
+  hobbies: string[];
   spots: { id: Spot; thing: string; label: string }[];
 };
 
-const HAND = '"KaiTi", "STKaiti", "Kaiti SC", "AR PL UKai CN", serif';
-const SERIF = '"Songti SC", "STSong", "Noto Serif SC", "Source Han Serif SC", "SimSun", serif';
+const HAND = '"WC Hand", "KaiTi", "STKaiti", "Kaiti SC", "AR PL UKai CN", serif';
+const SERIF = '"WC Serif", "Songti SC", "STSong", "Noto Serif SC", "Source Han Serif SC", "SimSun", serif';
+const SERIF_TEXT = '"Songti SC", "STSong", "Noto Serif SC", "SimSun", serif';
 const SANS = '"PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif';
 const MONO = 'ui-monospace, "JetBrains Mono", Consolas, monospace';
 
@@ -39,6 +41,8 @@ const C = {
   nightKey: new THREE.Color(0x9fb4ff),
   sun: new THREE.Color(0xffe2b0),
   moon: new THREE.Color(0x9ab8ff),
+  white: new THREE.Color(0xffffff),
+  nightCloud: new THREE.Color(0x4a5280),
 };
 
 /** 发光体积：越靠近光源越亮，叠加混合 */
@@ -140,7 +144,7 @@ function drawCover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: numb
 type Drop = { obj: THREE.Object3D; y: number; delay: number };
 
 /** 放在地上或桌上的东西，悬停会浮起来；挂墙上的不动 */
-const LIFT = new Set<Thing>(['works', 'lamp', 'duck', 'contact', 'plane', 'chair', 'plant']);
+const LIFT = new Set<Thing>(['works', 'lamp', 'duck', 'contact', 'plane', 'chair', 'plant', 'diary', 'shoes']);
 
 export class Room {
   scene = new THREE.Scene();
@@ -166,6 +170,12 @@ export class Room {
   private patchMat!: THREE.MeshBasicMaterial;
   private coneMat!: THREE.ShaderMaterial;
   private blobMats: THREE.MeshBasicMaterial[] = [];
+  private glow = {} as { bulb: THREE.SpriteMaterial; screen: THREE.SpriteMaterial; window: THREE.SpriteMaterial };
+  private clouds!: THREE.MeshBasicMaterial;
+  private diaryCover!: THREE.Group;
+  private headset!: THREE.Group;
+  private shoes!: THREE.Group;
+  private bulbPos = new THREE.Vector3();
   /** 当前的昼夜 / 台灯混合值，一直追目标值，切换时灯光慢慢变 */
   private look = { night: 1, lamp: 1 };
   private lookGoal = { night: 1, lamp: 1 };
@@ -218,6 +228,8 @@ export class Room {
     this.buildDust();
     this.buildWindowLight();
     this.buildBlobs();
+    this.buildHobbies();
+    this.buildGlows();
   }
 
   /** 图片异步加载完以后重画显示器和海报 */
@@ -284,6 +296,12 @@ export class Room {
     this.patchMat.opacity = mix(0.5, 0.24);
     this.coneMat.uniforms.uOpacity.value = l * mix(0.015, 0.075);
     (this.dust.material as THREE.PointsMaterial).opacity = 0.25 + l * 0.35;
+    this.glow.bulb.opacity = l * (0.18 + 0.5 * n);
+    this.glow.screen.opacity = 0.03 + 0.16 * n;
+    this.glow.window.color.lerpColors(C.sun, C.moon, n);
+    this.glow.window.opacity = mix(0.1, 0.13);
+    this.clouds.opacity = mix(0.85, 0.22);
+    this.clouds.color.lerpColors(C.white, C.nightCloud, n);
   }
 
   /* ───────────── 地板、墙 ───────────── */
@@ -367,6 +385,36 @@ export class Room {
     m(new THREE.PlaneGeometry(W, H), new THREE.MeshBasicMaterial({ map: daySky.tex, toneMapped: false }), g, [cx, cy, z], false);
     this.skyNight = new THREE.MeshBasicMaterial({ map: nightSky.tex, toneMapped: false, transparent: true });
     m(new THREE.PlaneGeometry(W, H), this.skyNight, g, [cx, cy, z + 0.001], false);
+    // 一层慢慢飘过去的云：贴图横向平铺，每帧挪一点
+    const cl = canvas(512, 256);
+    {
+      const r = rand(77);
+      for (let i = 0; i < 7; i++) {
+        const x = r() * 512;
+        const y = 40 + r() * 120;
+        const puffs = 4 + Math.floor(r() * 4);
+        for (let k = 0; k < puffs; k++) {
+          for (const dx of [-512, 0, 512]) {
+            const gx = x + dx + k * 20 - puffs * 10;
+            const gy = y + Math.sin(k * 1.7) * 7;
+            const rr = 16 + r() * 16;
+            const gr = cl.ctx.createRadialGradient(gx, gy, 0, gx, gy, rr);
+            gr.addColorStop(0, 'rgba(255,255,255,0.95)');
+            gr.addColorStop(0.7, 'rgba(255,255,255,0.75)');
+            gr.addColorStop(1, 'rgba(255,255,255,0)');
+            cl.ctx.fillStyle = gr;
+            cl.ctx.beginPath();
+            cl.ctx.arc(gx, gy, rr, 0, Math.PI * 2);
+            cl.ctx.fill();
+          }
+        }
+      }
+      cl.tex.wrapS = THREE.RepeatWrapping;
+      cl.tex.repeat.set(0.6, 1);
+      cl.tex.needsUpdate = true;
+    }
+    this.clouds = new THREE.MeshBasicMaterial({ map: cl.tex, transparent: true, depthWrite: false, toneMapped: false });
+    m(new THREE.PlaneGeometry(W, H * 0.55), this.clouds, g, [cx, cy + H * 0.2, z + 0.002], false);
     this.windowRect = { cx, cy, W, H, z };
 
     const frame = std(0xf6f1e8, { roughness: 0.6 });
@@ -611,7 +659,7 @@ export class Room {
     this.screenGlow.position.set(0.55, 2.3, -3.0);
     g.add(this.screenGlow);
 
-    this.views.works = { target: new THREE.Vector3(0.55, 2.2, -3.4), theta: 0.16, phi: 1.42, r: 4.8 };
+    this.views.works = { target: new THREE.Vector3(0.6, 2.2, -3.35), theta: 0.2, phi: 1.4, r: 5.6 };
     this.anchors.works = new THREE.Vector3(0.55, 3.05, -3.5);
   }
 
@@ -722,6 +770,7 @@ export class Room {
     cone.raycast = () => {};
     shadeG.add(cone);
 
+    this.bulbPos.copy(head).add(aim.clone().sub(head).normalize().multiplyScalar(0.12));
     this.lampSpot = new THREE.SpotLight(0xffb36b, 9, 0, 0.85, 0.6, 2);
     this.lampSpot.position.copy(head).add(aim.clone().sub(head).normalize().multiplyScalar(0.15));
     this.lampSpot.target.position.copy(aim);
@@ -1252,7 +1301,7 @@ export class Room {
     ctx.font = `22px ${MONO}`;
     ctx.fillText(this.data.nameEn, 334, 494);
     ctx.fillRect(50, 610, W - 100, 4);
-    ctx.font = `30px ${SERIF}`;
+    ctx.font = `30px ${SERIF_TEXT}`;
     wrapText(ctx, this.data.motto, 50, 670, W - 100, 46, 4);
     ctx.font = `20px ${MONO}`;
     ctx.fillStyle = '#7a6a5c';
@@ -1475,6 +1524,156 @@ export class Room {
     blob(smallMat, -0.3, 1.473, -2.82, 0.42, 0.34);
   }
 
+  /* ───────────── 和他本人有关的小东西：日记、飞行耳机、跑鞋 ───────────── */
+
+  private buildHobbies() {
+    // 桌角叠着的三本日记，最上面那本能翻开
+    const diary = this.thing('diary', 0.85);
+    const stack = new THREE.Group();
+    stack.position.set(1.82, 1.47, -3.42);
+    stack.rotation.y = -0.18;
+    diary.add(stack);
+    const covers = [0x8a5a3a, 0x34506e, 0x2f6f6a];
+    const paper = std(0xf4ecdc, { roughness: 0.9 });
+    covers.forEach((c, i) => {
+      const y = 0.03 + i * 0.062;
+      const book = new THREE.Group();
+      book.position.y = y;
+      book.rotation.y = (i - 1) * 0.12;
+      stack.add(book);
+      m(new THREE.BoxGeometry(0.3, 0.04, 0.42), paper, book, [0.005, 0, 0]);
+      if (i < 2) {
+        m(rbox(0.32, 0.055, 0.44, 0.012), std(c, { roughness: 0.6 }), book, [0, 0, 0]);
+      } else {
+        // 最上面一本：封底 + 可以绕书脊转的封面
+        m(rbox(0.32, 0.012, 0.44, 0.005), std(c, { roughness: 0.6 }), book, [0, -0.022, 0]);
+        const hinge = new THREE.Group();
+        hinge.position.set(-0.16, 0.022, 0);
+        book.add(hinge);
+        const coverMat = std(c, { roughness: 0.6 });
+        m(rbox(0.32, 0.012, 0.44, 0.005), coverMat, hinge, [0.16, 0, 0]);
+        m(new THREE.BoxGeometry(0.012, 0.014, 0.44), std(0xd9a441, { metalness: 0.4, roughness: 0.4 }), hinge, [0.27, 0.002, 0]);
+        this.diaryCover = hinge;
+        // 书签丝带
+        const ribbon = m(new THREE.BoxGeometry(0.02, 0.003, 0.12), std(0xc9563c), book, [0.06, -0.005, 0.26], false);
+        ribbon.rotation.x = 0.4;
+      }
+    });
+    this.views.diary = { target: new THREE.Vector3(1.82, 1.6, -3.42), theta: 0.4, phi: 1.1, r: 2.4 };
+    this.anchors.diary = new THREE.Vector3(1.82, 1.95, -3.42);
+
+    // 墙上挂钩上的飞行耳机
+    const hs = this.thing('headset', 0.9);
+    const hook = new THREE.Vector3(1.75, 2.95, -3.96);
+    m(new THREE.CylinderGeometry(0.018, 0.018, 0.09, 10), std(0x3a3330, { metalness: 0.6, roughness: 0.3 }), hs, [hook.x, hook.y, hook.z + 0.045]).rotation.x = Math.PI / 2;
+    const swing = new THREE.Group();
+    swing.position.set(hook.x, hook.y, hook.z + 0.08);
+    hs.add(swing);
+    this.headset = swing;
+    const band = std(0x2b2b2e, { roughness: 0.5 });
+    const pad = std(0x3a3a3e, { roughness: 0.9 });
+    const arc = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.016, 10, 28, Math.PI), band);
+    arc.position.y = -0.15;
+    arc.castShadow = true;
+    swing.add(arc);
+    for (const sx of [-1, 1]) {
+      const cup = m(new THREE.CylinderGeometry(0.075, 0.075, 0.06, 24), band, swing, [sx * 0.15, -0.2, 0]);
+      cup.rotation.z = Math.PI / 2;
+      const cush = m(new THREE.CylinderGeometry(0.065, 0.065, 0.025, 24), pad, swing, [sx * 0.11, -0.2, 0]);
+      cush.rotation.z = Math.PI / 2;
+      m(new THREE.CylinderGeometry(0.03, 0.03, 0.065, 16), std(0xc9563c, { roughness: 0.5 }), swing, [sx * 0.185, -0.2, 0]).rotation.z = Math.PI / 2;
+    }
+    // 麦克风杆
+    rod(new THREE.Vector3(-0.17, -0.22, 0.02), new THREE.Vector3(-0.1, -0.34, 0.12), 0.007, band, swing);
+    rod(new THREE.Vector3(-0.1, -0.34, 0.12), new THREE.Vector3(0.0, -0.36, 0.15), 0.007, band, swing);
+    m(new THREE.CapsuleGeometry(0.016, 0.03, 4, 8), pad, swing, [0.02, -0.36, 0.15]).rotation.z = Math.PI / 2;
+    this.views.headset = { target: new THREE.Vector3(1.75, 2.7, -3.9), theta: 0.2, phi: 1.5, r: 2.6 };
+    this.anchors.headset = new THREE.Vector3(1.75, 3.15, -3.8);
+
+    // 地上一双跑鞋
+    const sh = this.thing('shoes', 1.05);
+    const pair = new THREE.Group();
+    pair.position.set(-3.2, 0, 2.05);
+    pair.rotation.y = 0.5;
+    sh.add(pair);
+    this.shoes = pair;
+    const sole = std(0xf6f3ee, { roughness: 0.7 });
+    const upper = std(0xc9563c, { roughness: 0.75 });
+    const trim = std(0x2b2622, { roughness: 0.6 });
+    for (const [dx, dz, ry] of [
+      [-0.11, 0, 0.08],
+      [0.12, 0.06, -0.15],
+    ]) {
+      const shoe = new THREE.Group();
+      shoe.position.set(dx, 0, dz);
+      shoe.rotation.y = ry;
+      pair.add(shoe);
+      m(rbox(0.13, 0.04, 0.33, 0.018), sole, shoe, [0, 0.02, 0]);
+      m(rbox(0.12, 0.1, 0.24, 0.045), upper, shoe, [0, 0.085, -0.03]);
+      const toe = m(new THREE.SphereGeometry(0.062, 16, 12), upper, shoe, [0, 0.06, 0.09]);
+      toe.scale.set(0.95, 0.65, 1.1);
+      m(new THREE.BoxGeometry(0.125, 0.012, 0.2), trim, shoe, [0, 0.045, -0.02]);
+      for (let k = 0; k < 3; k++) m(new THREE.BoxGeometry(0.07, 0.008, 0.01), sole, shoe, [0, 0.137, 0.01 - k * 0.04], false);
+    }
+    this.views.shoes = { target: new THREE.Vector3(-3.2, 0.2, 2.05), theta: 1.0, phi: 1.1, r: 2.6 };
+    this.anchors.shoes = new THREE.Vector3(-3.2, 0.55, 2.05);
+  }
+
+  /** 翻开日记看一眼再合上 */
+  openDiary(now: number) {
+    const c = this.diaryCover;
+    this.animate(now, 1800, (k) => {
+      const e = k < 0.35 ? Math.sin((k / 0.35) * Math.PI * 0.5) : k > 0.75 ? Math.cos(((k - 0.75) / 0.25) * Math.PI * 0.5) : 1;
+      c.rotation.z = e * 2.1;
+    });
+  }
+
+  /** 耳机在挂钩上晃几下 */
+  swingHeadset(now: number) {
+    const g = this.headset;
+    this.animate(now, 2200, (k) => {
+      g.rotation.z = Math.sin(k * Math.PI * 7) * 0.35 * Math.pow(1 - k, 1.5);
+    });
+  }
+
+  /** 跑鞋原地小跑两步 */
+  jogShoes(now: number) {
+    const shoes = this.shoes.children;
+    this.animate(now, 900, (k) => {
+      shoes.forEach((s, i) => {
+        const ph = k * Math.PI * 4 + i * Math.PI;
+        s.position.y = Math.max(0, Math.sin(ph)) * 0.08 * (1 - k);
+        s.rotation.x = -Math.max(0, Math.sin(ph)) * 0.35 * (1 - k);
+      });
+    });
+  }
+
+  /* ───────────── 柔光：灯泡、屏幕、窗户周围亮一圈 ───────────── */
+
+  private buildGlows() {
+    const dot = canvas(128, 128);
+    const rg = dot.ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+    rg.addColorStop(0, 'rgba(255,255,255,1)');
+    rg.addColorStop(0.25, 'rgba(255,255,255,0.45)');
+    rg.addColorStop(1, 'rgba(255,255,255,0)');
+    dot.ctx.fillStyle = rg;
+    dot.ctx.fillRect(0, 0, 128, 128);
+    dot.tex.needsUpdate = true;
+    const make = (color: number, pos: THREE.Vector3, sx: number, sy: number) => {
+      const mat = new THREE.SpriteMaterial({ map: dot.tex, color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 });
+      const sp = new THREE.Sprite(mat);
+      sp.position.copy(pos);
+      sp.scale.set(sx, sy, 1);
+      sp.raycast = () => {};
+      this.scene.add(sp);
+      return mat;
+    };
+    this.glow.bulb = make(0xffb36b, this.bulbPos, 0.9, 0.9);
+    this.glow.screen = make(0x8fd0ff, new THREE.Vector3(0.55, 2.38, -3.45), 2.9, 1.9);
+    const w = this.windowRect;
+    this.glow.window = make(0xffffff, new THREE.Vector3(w.cx, w.cy, w.z + 0.1), w.W * 2.1, w.H * 1.9);
+  }
+
   /* ───────────── 动画 ───────────── */
 
   animate(now: number, dur: number, fn: (k: number) => void, done?: () => void) {
@@ -1567,6 +1766,8 @@ export class Room {
       arr[i + 2] = this.dustSeed[i + 2] + Math.cos(t * 0.11 + ph) * 0.25;
     }
     this.dust.geometry.getAttribute('position').needsUpdate = true;
+    // 云往右飘
+    if (this.clouds.map) this.clouds.map.offset.x = -t * 0.006;
     // 窗外飞过的飞机：25 秒一趟，航行灯一秒闪一下
     const u = this.flyer.userData;
     const fk = (t % 25) / 25;

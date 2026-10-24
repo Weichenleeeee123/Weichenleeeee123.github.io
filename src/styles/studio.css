@@ -1,4 +1,20 @@
 /* ───────── 围城的房间 ───────── */
+/* 只截了页面上用到的字（scripts/subset-fonts.py），缺的字退回系统字体。
+   粗细写成范围，免得浏览器给它再硬加粗一遍 */
+@font-face {
+  font-family: 'WC Serif';
+  src: url('/fonts/wc-serif.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'WC Hand';
+  src: url('/fonts/wc-hand.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
 @font-face {
   font-family: 'JetBrains Mono';
   src: url('/fonts/jetbrains-mono-var.woff2') format('woff2');
@@ -15,9 +31,11 @@
   --teal: #2f6f6a;
   --mustard: #d9a441;
   --navy: #34506e;
-  --serif: 'Songti SC', 'STSong', 'Noto Serif SC', 'Source Han Serif SC', 'SimSun', serif;
+  /* 正文里的宋体：WC Serif 只有最粗的一档，大段文字用系统宋体 */
+  --serif-text: 'Songti SC', 'STSong', 'Noto Serif SC', 'Source Han Serif SC', 'SimSun', serif;
+  --serif: 'WC Serif', 'Songti SC', 'STSong', 'Noto Serif SC', 'Source Han Serif SC', 'SimSun', serif;
   --sans: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', system-ui, sans-serif;
-  --hand: 'KaiTi', 'STKaiti', 'Kaiti SC', 'AR PL UKai CN', var(--serif);
+  --hand: 'WC Hand', 'KaiTi', 'STKaiti', 'Kaiti SC', 'AR PL UKai CN', var(--serif);
   --mono: 'JetBrains Mono', ui-monospace, Consolas, monospace;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --drawer-w: min(540px, 46vw);
@@ -305,7 +323,7 @@ html[data-sky='day'] .st-pill {
 }
 
 .st-motto {
-  font-family: var(--serif);
+  font-family: var(--serif-text);
   font-size: clamp(1rem, 1.35vw, 1.2rem);
   line-height: 1.85;
   margin: 0 0 1.6rem;
@@ -403,9 +421,12 @@ html[data-sky='day'] .st-dock {
 
 .st-dock button {
   display: grid;
-  justify-items: center;
-  gap: 0.05rem;
-  padding: 0.45rem 0.95rem 0.4rem;
+  grid-template-columns: auto auto;
+  grid-template-rows: auto auto;
+  column-gap: 0.45rem;
+  align-items: center;
+  justify-items: start;
+  padding: 0.45rem 0.95rem 0.4rem 0.75rem;
   border: 0;
   border-radius: 14px;
   background: transparent;
@@ -639,7 +660,6 @@ html:not(.js) .st-loader {
 .open-about .p-about,
 .open-contact .p-contact {
   display: block;
-  animation: rise 0.7s var(--ease) both 0.15s;
 }
 
 @keyframes rise {
@@ -1110,7 +1130,7 @@ html:not(.js) .st-loader {
 }
 
 .poster-motto {
-  font-family: var(--serif);
+  font-family: var(--serif-text);
   font-size: 1.15rem;
   line-height: 1.9;
   margin: 0 0 1.2rem;
@@ -1529,4 +1549,180 @@ html:not(.js) .p-next {
 .no-gl [data-sound],
 html:not(.js) [data-sound] {
   display: none;
+}
+
+/* ───── 细节：图标、暗角、闪烁的冒号、加载点 ───── */
+
+.dk-ic {
+  grid-row: span 2;
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.85;
+  transition: transform 0.35s var(--ease);
+}
+
+.st-dock button:hover .dk-ic {
+  transform: rotate(-8deg) scale(1.12);
+}
+
+/* 四周压一点暗，视线往房间中间收 */
+.studio::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background: radial-gradient(120% 95% at 55% 50%, transparent 55%, rgba(10, 6, 4, 0.38) 100%);
+  transition: opacity 0.8s;
+}
+
+html[data-sky='day'] .studio::after {
+  background: radial-gradient(120% 95% at 55% 50%, transparent 60%, rgba(120, 84, 50, 0.16) 100%);
+}
+
+.list .studio::after,
+html:not(.js) .studio::after {
+  display: none;
+}
+
+.colon {
+  font-style: normal;
+  animation: blink 1s steps(1) infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.15;
+  }
+}
+
+.dots i {
+  font-style: normal;
+  animation: dot 1.2s infinite;
+}
+
+.dots i:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.dots i:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes dot {
+  0%,
+  60%,
+  100% {
+    opacity: 0.2;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+
+/* ───── 面板里的东西依次浮上来 ───── */
+
+.drawer-open .panel > * {
+  animation: rise 0.65s var(--ease) backwards;
+}
+
+.drawer-open .panel > :nth-child(1) {
+  animation-delay: 0.18s;
+}
+
+.drawer-open .panel > :nth-child(2) {
+  animation-delay: 0.24s;
+}
+
+.drawer-open .panel > :nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.drawer-open .panel > :nth-child(4) {
+  animation-delay: 0.36s;
+}
+
+.drawer-open .panel > :nth-child(n + 5) {
+  animation-delay: 0.42s;
+}
+
+.drawer-open .pins li,
+.drawer-open .books li,
+.drawer-open .board li,
+.drawer-open .phone li {
+  animation: rise 0.55s var(--ease) backwards;
+}
+
+.drawer-open :is(.pins, .books, .board, .phone) li:nth-child(1) { animation-delay: 0.32s; }
+.drawer-open :is(.pins, .books, .board, .phone) li:nth-child(2) { animation-delay: 0.37s; }
+.drawer-open :is(.pins, .books, .board, .phone) li:nth-child(3) { animation-delay: 0.42s; }
+.drawer-open :is(.pins, .books, .board, .phone) li:nth-child(4) { animation-delay: 0.47s; }
+.drawer-open :is(.pins, .books, .board, .phone) li:nth-child(5) { animation-delay: 0.52s; }
+.drawer-open :is(.pins, .books, .board, .phone) li:nth-child(6) { animation-delay: 0.57s; }
+.drawer-open :is(.pins, .books, .board, .phone) li:nth-child(n + 7) { animation-delay: 0.62s; }
+
+/* 票根本身是歪着钉的，浮上来以后要回到自己的角度 */
+.drawer-open .pins li {
+  animation-name: rise-pin;
+}
+
+@keyframes rise-pin {
+  from {
+    opacity: 0;
+    transform: translateY(18px) rotate(0);
+  }
+  to {
+    transform: rotate(var(--r));
+  }
+}
+
+.list .panel > *,
+.list .panel li {
+  animation: none !important;
+}
+
+::selection {
+  background: var(--terra);
+  color: #fff;
+}
+
+.st-drawer {
+  scrollbar-color: rgba(127, 127, 127, 0.45) transparent;
+}
+
+.st-close {
+  border-radius: 0 0 0 14px;
+}
+
+.st-close span {
+  padding: 0.3rem 0.75rem;
+  border-radius: 99px;
+  background: rgba(127, 127, 127, 0.14);
+  backdrop-filter: blur(8px);
+  transition: background 0.2s;
+}
+
+.st-close:hover span {
+  background: rgba(127, 127, 127, 0.28);
+  text-decoration: none;
+}
+
+/* 窄一点的桌面：标题收小，别压到房间上 */
+@media (min-width: 761px) and (max-width: 1100px) {
+  .st-hero {
+    max-width: 19rem;
+  }
+
+  .st-title {
+    font-size: clamp(3rem, 7vw, 5rem);
+  }
+
+  .st-motto {
+    font-size: 0.95rem;
+  }
 }

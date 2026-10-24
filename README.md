@@ -31,6 +31,21 @@ npm run build    # 输出到 dist/
 
 截图放 `src/assets/covers/`，在 `site.ts` 顶部 import。
 
+## 字体
+
+房间页的标题和手写字用两款开源字体，只截了页面上用到的字，打成 `public/fonts/wc-serif.woff2`、`wc-hand.woff2`（各几十 KB）：
+
+- WC Serif：思源宋体 Noto Serif SC Black（SIL OFL 1.1）
+- WC Hand：霞鹜文楷 LXGW WenKai（SIL OFL 1.1）
+
+截子集算修改，按协议改了字体名。改了 `site.ts` 里的名字、座右铭、技能、日期这些字段后，重新跑一次：
+
+```bash
+python scripts/subset-fonts.py --serif <NotoSerifSC-Black.otf> --hand <LXGWWenKai-Regular.ttf>
+```
+
+不跑也不会坏，新出现的字会退回系统字体。
+
 ## 代码在哪
 
 | 文件 | 管什么 |
