@@ -25,6 +25,7 @@ const TIPS: Record<Thing, string> = {
   diary: '日记本 · 翻开看看',
   headset: '飞行耳机 · 碰一下',
   shoes: '跑鞋 · 踢一下',
+  record: '唱机 · 放 / 停音乐',
 };
 const QUACKS = ['嘎？', '头好痛……', '嘎嘎！', '这是我的房间', '别光看我，去看看作品', '我是机长（不是）', '再戳要生气了'];
 
@@ -121,6 +122,7 @@ function start(renderer: THREE.WebGLRenderer) {
   room.loadImages();
   if (coarse) $('[data-hint]').textContent = '滑动转一转 · 点房间里的东西';
 
+  sfx.onMusic = (playing, at) => room.setRecord(playing, at);
   const showWork = wireDoc();
   onWork = (i) => room.drawScreen(i);
 
@@ -204,6 +206,7 @@ function start(renderer: THREE.WebGLRenderer) {
     if (spot === 'works') room.drawScreen(workIndex);
     if (spot === 'contact') room.drawPhone(true);
     sfx.swish(true);
+    sfx.duck(true);
     $('[data-drawer]').scrollTop = 0;
     hero.setAttribute('aria-hidden', 'true');
   };
@@ -224,6 +227,7 @@ function start(renderer: THREE.WebGLRenderer) {
     setHome();
     room.drawPhone(false);
     sfx.swish(false);
+    sfx.duck(false);
     history.replaceState(null, '', location.pathname);
     hero.removeAttribute('aria-hidden');
   };
@@ -303,6 +307,7 @@ function start(renderer: THREE.WebGLRenderer) {
     offXGoal = 0;
     offYGoal = 0;
     say('plane', '起飞！', 1500);
+    sfx.fadeOutMusic();
     setTimeout(() => {
       sfx.takeoff();
       room.takeoff(now(), () => {
@@ -393,6 +398,14 @@ function start(renderer: THREE.WebGLRenderer) {
         sfx.tick(0.5);
         say('shoes', data.hobbies[2] ?? '跑步', 2200);
         break;
+      case 'record': {
+        // 第一次点页面时音乐已经自动放起来了；如果这一下正好点在唱机上，别马上又关掉
+        if (sfx.playing && performance.now() - sfx.musicStartedAt < 800) break;
+        const on = sfx.toggleMusic();
+        paintSound();
+        say('record', on ? '♪ 放一张唱片' : '唱片停了', 1800);
+        break;
+      }
       case 'plane':
         if (now() - planeArmed < 3500) fly();
         else {

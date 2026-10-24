@@ -55,6 +55,8 @@ python scripts/subset-fonts.py --serif <NotoSerifSC-Black.otf> --hand <LXGWWenKa
 | `src/pages/studio.astro` | 房间页面：底部导航和六块内容（不支持 WebGL 时就是一张普通网页） |
 | `src/scripts/studio/room.ts` | 房间里的每样东西，全部是基本几何体 + 画布贴图，没有外部模型 |
 | `src/scripts/studio/main.ts` | 房间的镜头、拖动、点选、抽屉、白天黑夜、起飞去驾驶舱 |
+| `src/scripts/studio/sfx.ts` | 房间的音效（现场合成）和唱机的背景音乐；`wc-sound`、`wc-music` 记开关 |
+| `scripts/gen-lofi.py` | 房间背景音乐 `public/audio/room-lofi.mp3`：原创 lo-fi 循环，全部代码合成，首尾无缝 |
 | `src/styles/studio.css` | 房间的样式 |
 | `src/scripts/flight.ts` | 滚动位置 → 速度/高度/姿态/航向。每段页面的进度怎么换算成飞行状态都在这 |
 | `src/scripts/world.ts` | 挡风玻璃外的 3D 世界：天空、星星、月亮、城市灯、跑道灯、进近频闪、云层 |

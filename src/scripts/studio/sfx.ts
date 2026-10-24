@@ -10,6 +10,15 @@ export class Sfx {
   private verb!: ConvolverNode;
   private noise!: AudioBuffer;
   private lastTick = 0;
+  /** 唱机：背景音乐。默认开，记在 wc-music */
+  musicOn: boolean;
+  onMusic?: (playing: boolean, startedAt: number) => void;
+  private musicGain: GainNode | null = null;
+  private musicSrc: AudioBufferSourceNode | null = null;
+  private musicBuf: AudioBuffer | null = null;
+  private musicLoading = false;
+  private ducked = false;
+  musicStartedAt = 0;
 
   constructor() {
     let saved: string | null = null;
@@ -19,6 +28,19 @@ export class Sfx {
       /* 隐私模式 */
     }
     this.on = saved !== 'off';
+    let m: string | null = null;
+    try {
+      m = localStorage.getItem('wc-music');
+    } catch {
+      /* 隐私模式 */
+    }
+    this.musicOn = m !== 'off';
+    // 切到别的标签页就停住，回来接着放
+    document.addEventListener('visibilitychange', () => {
+      if (!this.ctx) return;
+      if (document.hidden) this.ctx.suspend();
+      else this.ctx.resume();
+    });
     const unlock = () => this.ensure();
     addEventListener('pointerdown', unlock, { once: true, capture: true });
     addEventListener('keydown', unlock, { once: true, capture: true });
@@ -31,8 +53,95 @@ export class Sfx {
     } catch {
       /* 隐私模式 */
     }
-    if (this.on) this.tick(1.3);
+    if (this.on) {
+      this.tick(1.3);
+      this.startMusic();
+    } else this.stopMusic(0.4);
     return this.on;
+  }
+
+  get playing() {
+    return !!this.musicSrc;
+  }
+
+  /** 唱机上点一下：放 / 停 */
+  toggleMusic() {
+    this.musicOn = !this.playing;
+    try {
+      localStorage.setItem('wc-music', this.musicOn ? 'on' : 'off');
+    } catch {
+      /* 隐私模式 */
+    }
+    if (this.musicOn) {
+      if (!this.on) this.toggle();
+      this.ensure();
+      this.startMusic();
+    } else this.stopMusic(0.9);
+    return this.musicOn;
+  }
+
+  /** 打开面板时音乐稍微让一让 */
+  duck(on: boolean) {
+    this.ducked = on;
+    this.rampMusic(this.musicLevel(), 0.6);
+  }
+
+  fadeOutMusic() {
+    this.stopMusic(1.4);
+  }
+
+  private musicLevel() {
+    return this.ducked ? 0.22 : 0.36;
+  }
+
+  private rampMusic(to: number, sec: number) {
+    if (!this.ctx || !this.musicGain) return;
+    const g = this.musicGain.gain;
+    const t = this.ctx.currentTime;
+    g.cancelScheduledValues(t);
+    g.setValueAtTime(g.value, t);
+    g.linearRampToValueAtTime(to, t + sec);
+  }
+
+  private async startMusic() {
+    const ctx = this.ctx;
+    if (!ctx || !this.on || !this.musicOn || this.musicSrc) return;
+    if (!this.musicBuf) {
+      if (this.musicLoading) return;
+      this.musicLoading = true;
+      try {
+        const res = await fetch('/audio/room-lofi.mp3');
+        this.musicBuf = await ctx.decodeAudioData(await res.arrayBuffer());
+      } catch {
+        this.musicLoading = false;
+        return;
+      }
+      this.musicLoading = false;
+      if (!this.on || !this.musicOn || this.musicSrc) return;
+    }
+    if (!this.musicGain) {
+      this.musicGain = ctx.createGain();
+      this.musicGain.gain.value = 0;
+      this.musicGain.connect(this.master);
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = this.musicBuf;
+    src.loop = true;
+    src.connect(this.musicGain);
+    src.start();
+    this.musicSrc = src;
+    this.musicStartedAt = performance.now();
+    this.rampMusic(this.musicLevel(), 2.5);
+    this.onMusic?.(true, this.musicStartedAt);
+  }
+
+  private stopMusic(fade: number) {
+    const src = this.musicSrc;
+    if (!src || !this.ctx) return;
+    this.musicSrc = null;
+    this.rampMusic(0, fade);
+    src.stop(this.ctx.currentTime + fade + 0.05);
+    this.onMusic?.(false, 0);
   }
 
   private ensure() {
@@ -67,6 +176,8 @@ export class Sfx {
       const wet = ctx.createGain();
       wet.gain.value = 0.32;
       this.verb.connect(wet).connect(this.master);
+      // 第一次点到页面就把唱片放起来（声音和音乐都没关的话）
+      this.startMusic();
       return ctx;
     } catch {
       return null;

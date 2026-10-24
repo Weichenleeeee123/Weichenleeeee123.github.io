@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 
 export type Spot = 'works' | 'journey' | 'shelf' | 'skills' | 'about' | 'contact';
-export type Thing = Spot | 'duck' | 'lamp' | 'plane' | 'window' | 'clock' | 'chair' | 'plant' | 'diary' | 'headset' | 'shoes';
+export type Thing = Spot | 'duck' | 'lamp' | 'plane' | 'window' | 'clock' | 'chair' | 'plant' | 'diary' | 'headset' | 'shoes' | 'record';
 
 export type RoomData = {
   projects: { code: string; name: string; sub: string; when: string; award: string; image: string }[];
@@ -144,7 +144,7 @@ function drawCover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: numb
 type Drop = { obj: THREE.Object3D; y: number; delay: number };
 
 /** 放在地上或桌上的东西，悬停会浮起来；挂墙上的不动 */
-const LIFT = new Set<Thing>(['works', 'lamp', 'duck', 'contact', 'plane', 'chair', 'plant', 'diary', 'shoes']);
+const LIFT = new Set<Thing>(['works', 'lamp', 'duck', 'contact', 'plane', 'chair', 'plant', 'diary', 'shoes', 'record']);
 
 export class Room {
   scene = new THREE.Scene();
@@ -176,6 +176,13 @@ export class Room {
   private headset!: THREE.Group;
   private shoes!: THREE.Group;
   private bulbPos = new THREE.Vector3();
+  private disc!: THREE.Group;
+  private arm!: THREE.Group;
+  private speaker!: THREE.Group;
+  private notes: THREE.Sprite[] = [];
+  private spin = 0;
+  private spinGoal = 0;
+  private musicAt = 0;
   /** 当前的昼夜 / 台灯混合值，一直追目标值，切换时灯光慢慢变 */
   private look = { night: 1, lamp: 1 };
   private lookGoal = { night: 1, lamp: 1 };
@@ -229,6 +236,7 @@ export class Room {
     this.buildWindowLight();
     this.buildBlobs();
     this.buildHobbies();
+    this.buildRecordPlayer();
     this.buildGlows();
   }
 
@@ -1593,7 +1601,7 @@ export class Room {
     // 地上一双跑鞋
     const sh = this.thing('shoes', 1.05);
     const pair = new THREE.Group();
-    pair.position.set(-3.2, 0, 2.05);
+    pair.position.set(-3.15, 0, 2.45);
     pair.rotation.y = 0.5;
     sh.add(pair);
     this.shoes = pair;
@@ -1615,8 +1623,121 @@ export class Room {
       m(new THREE.BoxGeometry(0.125, 0.012, 0.2), trim, shoe, [0, 0.045, -0.02]);
       for (let k = 0; k < 3; k++) m(new THREE.BoxGeometry(0.07, 0.008, 0.01), sole, shoe, [0, 0.137, 0.01 - k * 0.04], false);
     }
-    this.views.shoes = { target: new THREE.Vector3(-3.2, 0.2, 2.05), theta: 1.0, phi: 1.1, r: 2.6 };
-    this.anchors.shoes = new THREE.Vector3(-3.2, 0.55, 2.05);
+    this.views.shoes = { target: new THREE.Vector3(-3.15, 0.2, 2.45), theta: 1.0, phi: 1.1, r: 2.6 };
+    this.anchors.shoes = new THREE.Vector3(-3.15, 0.55, 2.45);
+  }
+
+  /** 唱机：音乐放 / 停的时候调用 */
+  setRecord(playing: boolean, startedAt: number) {
+    this.spinGoal = playing ? 1 : 0;
+    if (playing) this.musicAt = startedAt;
+  }
+
+  private buildRecordPlayer() {
+    // 白板下面的矮柜
+    const cab = new THREE.Group();
+    this.scene.add(cab);
+    this.drop(cab, 1, 0.7);
+    const wood = std(0x9a6a45, { roughness: 0.65 });
+    const front = std(0xe8dcc6, { roughness: 0.7 });
+    const legM = std(0x2b2622, { roughness: 0.5 });
+    const cx = -3.73;
+    const cz = 0.85;
+    m(rbox(0.5, 0.56, 1.7, 0.02), wood, cab, [cx, 0.42, cz]);
+    for (const dz of [-0.42, 0.42]) {
+      m(new THREE.BoxGeometry(0.02, 0.48, 0.8), front, cab, [cx + 0.255, 0.42, cz + dz]);
+      m(new THREE.CylinderGeometry(0.012, 0.012, 0.12, 8), legM, cab, [cx + 0.27, 0.42, cz + dz * 0.12]);
+    }
+    for (const [dx, dz] of [
+      [-0.2, -0.78],
+      [-0.2, 0.78],
+      [0.2, -0.78],
+      [0.2, 0.78],
+    ])
+      m(new THREE.CylinderGeometry(0.018, 0.012, 0.14, 8), legM, cab, [cx + dx, 0.07, cz + dz]);
+
+    // 唱机
+    const g = this.thing('record', 0.95);
+    const top = 0.7;
+    const px = -3.72;
+    const pz = 0.55;
+    m(rbox(0.44, 0.08, 0.52, 0.02), std(0x6b4a33, { roughness: 0.5 }), g, [px, top + 0.04, pz]);
+    m(new THREE.CylinderGeometry(0.18, 0.18, 0.02, 40), std(0x2b2b2e, { metalness: 0.5, roughness: 0.35 }), g, [px - 0.02, top + 0.09, pz + 0.04]);
+    const label = canvas(256, 256);
+    {
+      const { ctx } = label;
+      ctx.fillStyle = '#121212';
+      ctx.fillRect(0, 0, 256, 256);
+      for (let r = 120; r > 50; r -= 3) {
+        ctx.strokeStyle = r % 9 === 0 ? 'rgba(255,255,255,0.09)' : 'rgba(255,255,255,0.035)';
+        ctx.beginPath();
+        ctx.arc(128, 128, r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.fillStyle = '#c9563c';
+      ctx.beginPath();
+      ctx.arc(128, 128, 46, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#f3e7d3';
+      ctx.textAlign = 'center';
+      ctx.font = `900 22px ${SERIF}`;
+      ctx.fillText(this.data.callsign, 128, 122);
+      ctx.font = `11px ${MONO}`;
+      ctx.fillText('ROOM · 76 BPM', 128, 144);
+      ctx.fillStyle = '#121212';
+      ctx.beginPath();
+      ctx.arc(128, 128, 4, 0, Math.PI * 2);
+      ctx.fill();
+      label.tex.needsUpdate = true;
+    }
+    this.disc = new THREE.Group();
+    this.disc.position.set(px - 0.02, top + 0.103, pz + 0.04);
+    g.add(this.disc);
+    const vinylSide = std(0x111111, { roughness: 0.3 });
+    m(new THREE.CylinderGeometry(0.165, 0.165, 0.006, 48), [vinylSide, std(0xffffff, { map: label.tex, roughness: 0.25 }), vinylSide], this.disc, [0, 0, 0]);
+    // 唱臂：转轴在右后角
+    const pivot = new THREE.Vector3(px + 0.15, top + 0.1, pz - 0.15);
+    m(new THREE.CylinderGeometry(0.03, 0.035, 0.05, 16), std(0xb9bec4, { metalness: 0.7, roughness: 0.3 }), g, [pivot.x, pivot.y, pivot.z]);
+    this.arm = new THREE.Group();
+    this.arm.position.set(pivot.x, pivot.y + 0.03, pivot.z);
+    this.arm.rotation.y = 0.38;
+    g.add(this.arm);
+    const metal = std(0xd8dde2, { metalness: 0.8, roughness: 0.25 });
+    m(new THREE.BoxGeometry(0.012, 0.012, 0.25), metal, this.arm, [0, 0, 0.12]);
+    m(new THREE.BoxGeometry(0.03, 0.012, 0.045), legM, this.arm, [0, -0.008, 0.25]);
+    m(new THREE.CylinderGeometry(0.02, 0.02, 0.05, 12), metal, this.arm, [0, 0, -0.04]).rotation.x = Math.PI / 2;
+
+    // 小音箱
+    this.speaker = new THREE.Group();
+    this.speaker.position.set(-3.74, top, 1.32);
+    g.add(this.speaker);
+    m(rbox(0.26, 0.36, 0.26, 0.03), std(0x34506e, { roughness: 0.6 }), this.speaker, [0, 0.18, 0]);
+    for (const [y, r] of [
+      [0.24, 0.07],
+      [0.1, 0.04],
+    ]) {
+      const cone = m(new THREE.CylinderGeometry(r, r, 0.01, 24), std(0x1e1b18, { roughness: 0.8 }), this.speaker, [0.131, y, 0]);
+      cone.rotation.z = Math.PI / 2;
+    }
+
+    // 飘起来的音符
+    const note = canvas(64, 64);
+    note.ctx.fillStyle = '#d9a441';
+    note.ctx.font = `48px ${SANS}`;
+    note.ctx.textAlign = 'center';
+    note.ctx.textBaseline = 'middle';
+    note.ctx.fillText('♪', 32, 34);
+    note.tex.needsUpdate = true;
+    for (let i = 0; i < 4; i++) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: note.tex, transparent: true, depthWrite: false, opacity: 0 }));
+      sp.scale.setScalar(0.14);
+      sp.userData.base = new THREE.Vector3(px, top + 0.25, pz + 0.05);
+      sp.raycast = () => {};
+      this.scene.add(sp);
+      this.notes.push(sp);
+    }
+    this.views.record = { target: new THREE.Vector3(px, 0.9, pz + 0.3), theta: 1.2, phi: 1.1, r: 2.8 };
+    this.anchors.record = new THREE.Vector3(px, 1.25, pz);
   }
 
   /** 翻开日记看一眼再合上 */
@@ -1766,6 +1887,21 @@ export class Room {
       arr[i + 2] = this.dustSeed[i + 2] + Math.cos(t * 0.11 + ph) * 0.25;
     }
     this.dust.geometry.getAttribute('position').needsUpdate = true;
+    // 唱机：唱片转、唱臂落下、音符往上飘、小音箱跟着拍子鼓一下
+    this.spin += (this.spinGoal - this.spin) * (1 - Math.exp(-dt * 2.5));
+    this.disc.rotation.y -= this.spin * dt * 3.5;
+    const armGoal = this.spinGoal > 0 ? -0.22 : 0.38;
+    this.arm.rotation.y += (armGoal - this.arm.rotation.y) * (1 - Math.exp(-dt * 3));
+    const beats = (now - this.musicAt) / (60000 / 76);
+    const pulse = this.spinGoal > 0 ? Math.exp(-(beats % 1) * 7) * 0.05 : 0;
+    this.speaker.scale.set(1, 1 + pulse, 1 + pulse);
+    this.notes.forEach((n, i) => {
+      const k = (t * 0.28 + i / this.notes.length) % 1;
+      const b = n.userData.base as THREE.Vector3;
+      n.position.set(b.x + Math.sin(k * 5 + i) * 0.08, b.y + k * 0.9, b.z + Math.cos(k * 4 + i * 2) * 0.06);
+      n.material.opacity = Math.sin(k * Math.PI) * this.spin * 0.9;
+      n.material.rotation = Math.sin(k * 6 + i) * 0.4;
+    });
     // 云往右飘
     if (this.clouds.map) this.clouds.map.offset.x = -t * 0.006;
     // 窗外飞过的飞机：25 秒一趟，航行灯一秒闪一下
