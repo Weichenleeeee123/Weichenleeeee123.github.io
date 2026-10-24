@@ -64,14 +64,14 @@ def collect():
         + fields(site, 'item')
         + fields(site, 'label')
         + ''.join(re.findall(r"toast\(['`]([^'`$]*)", spire_js))
-        + '遗物药水第层最后声音已复制'
+        + '遗物药水第层最后声音已复制已击败从头再爬嘎？……头有点疼。别戳了，去爬塔吧。全部看完了谢谢你到这里'
     )
     spire_hand = (
         fields(spire, 'label')
         + fields(spire, 'date')
         + fields(spire, 'text')
         + hobbies
-        + '现在墨线是真走过的路淡没岔起—'
+        + '现在墨线是真走过的路淡没岔起—从这里出发'
     )
     return [serif + ASCII, hand + ASCII, spire_serif + ASCII, spire_hand + ASCII]
 

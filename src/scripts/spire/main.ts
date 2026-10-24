@@ -65,7 +65,20 @@ const markSeen = (n: number) => {
   void floorStat?.offsetWidth;
   floorStat?.classList.add('bump');
   seenCount.textContent = String(seen.size);
+  if (seen.size === nodes.size) {
+    floorStat?.classList.add('done');
+    setTimeout(() => {
+      toast(`${nodes.size} 层全部看完了。谢谢你爬到这里。`);
+      sfx.coin();
+    }, 900);
+  }
 };
+if (seen.size === nodes.size) floorStat?.classList.add('done');
+try {
+  localStorage.setItem('wc-spire-visited', '1');
+} catch {
+  /* 隐私模式 */
+}
 
 /* ───── 小鸭子（当前位置） ───── */
 
@@ -187,10 +200,16 @@ let current: HTMLElement | null = null;
 let currentFloor = -1;
 let mapScroll = 0;
 
+const mapWrap = $('.map-wrap')!;
+const hero = $('[data-hero]')!;
 const setView = (v: View) => {
   if (root.dataset.view === 'map' && v !== 'map') mapScroll = scrollY;
   root.dataset.view = v;
   html.classList.toggle('locked', v !== 'map');
+  // 盖在上面的画面打开时，后面的东西不让 Tab 键摸到
+  mapWrap.inert = v !== 'map';
+  hero.inert = v !== 'hero';
+  if (v !== 'map') closeLegend();
 };
 
 const closeScreen = () => {
@@ -314,6 +333,11 @@ addEventListener('pageshow', () => fade.classList.remove('on'));
 addEventListener('keydown', (e) => {
   if (e.defaultPrevented || $('[data-style-menu][open]')) return;
   const view = root.dataset.view;
+  if (e.key === 'Escape' && !inspectBox.hidden) {
+    closeInspect();
+    return;
+  }
+  if (!inspectBox.hidden) return;
   if (e.key === 'Escape') {
     if (view === 'screen') go('#map');
     else if (view === 'hero') go('#map');
@@ -431,6 +455,71 @@ soundBtn.addEventListener('click', () => {
   showTip(soundBtn);
 });
 
+
+/* ───── 战斗里点卡牌：放大看 ───── */
+
+const inspectBox = $('[data-inspect]')!;
+function closeInspect() {
+  if (inspectBox.hidden) return;
+  inspectBox.hidden = true;
+  inspectBox.replaceChildren();
+  sfx.card();
+}
+for (const card of $$<HTMLElement>('.fight [data-card]')) {
+  card.addEventListener('click', () => {
+    const big = card.cloneNode(true) as HTMLElement;
+    big.classList.remove('tilting');
+    big.style.cssText = '';
+    const note = document.createElement('p');
+    note.textContent = '点任意处关上';
+    inspectBox.replaceChildren(big, note);
+    inspectBox.hidden = false;
+    hideTip();
+    sfx.card();
+  });
+}
+inspectBox.addEventListener('click', closeInspect);
+
+/* ───── 角色档案：戳一下可达鸭 ───── */
+
+const duck = $('[data-duck]');
+const duckLines = ['嘎？', '嘎嘎。', '……头有点疼。', '别戳了，去爬塔吧。'];
+let pokes = 0;
+const pokeDuck = () => {
+  if (!duck) return;
+  duck.classList.remove('poked');
+  void duck.offsetWidth;
+  duck.classList.add('poked');
+  sfx.quack();
+  toast(duckLines[Math.min(pokes++, duckLines.length - 1)]);
+};
+duck?.addEventListener('click', pokeDuck);
+duck?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    pokeDuck();
+  }
+});
+
+/* ───── 窄屏的图例 ───── */
+
+const legend = $('.legend')!;
+const legendBtn = $<HTMLButtonElement>('[data-legend-toggle]')!;
+function closeLegend() {
+  legend.classList.remove('open');
+  legendBtn.setAttribute('aria-expanded', 'false');
+}
+legendBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const open = !legend.classList.contains('open');
+  legend.classList.toggle('open', open);
+  legendBtn.setAttribute('aria-expanded', String(open));
+  sfx.pick();
+});
+document.addEventListener('click', (e) => {
+  if (legend.classList.contains('open') && !legend.contains(e.target as Node)) closeLegend();
+});
+
 /* ───── 卡牌：跟着鼠标微微倾斜，一道光扫过 ───── */
 
 if (finePointer && !calm) {
@@ -523,6 +612,17 @@ function embers() {
   };
   resize();
   addEventListener('resize', resize);
+  // 一颗火星的光晕先画好，每帧只贴图，不再每颗都新建渐变
+  const sprite = document.createElement('canvas');
+  sprite.width = sprite.height = 64;
+  const sc = sprite.getContext('2d')!;
+  const g = sc.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, 'rgba(255, 220, 140, 1)');
+  g.addColorStop(0.18, 'rgba(255, 170, 70, 0.75)');
+  g.addColorStop(0.45, 'rgba(255, 110, 35, 0.25)');
+  g.addColorStop(1, 'rgba(255, 80, 20, 0)');
+  sc.fillStyle = g;
+  sc.fillRect(0, 0, 64, 64);
   type P = { x: number; y: number; vx: number; vy: number; r: number; life: number; max: number; seed: number };
   const count = innerWidth < 700 ? 18 : 42;
   const spawn = (p?: P): P => {
@@ -558,15 +658,12 @@ function embers() {
       if (p.life > p.max || p.y < -10) spawn(p);
       const k = p.life / p.max;
       const a = Math.sin(Math.PI * k) * (0.55 + 0.45 * Math.sin(p.life * 0.2 + p.seed)) * dim;
-      const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 4);
-      g.addColorStop(0, `rgba(255, 210, 120, ${(a * 0.9).toFixed(3)})`);
-      g.addColorStop(0.35, `rgba(255, 120, 40, ${(a * 0.45).toFixed(3)})`);
-      g.addColorStop(1, 'rgba(255, 80, 20, 0)');
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.r * 4, 0, Math.PI * 2);
-      ctx.fill();
+      if (a <= 0.01) continue;
+      const size = p.r * 8;
+      ctx.globalAlpha = Math.min(1, a * 0.85);
+      ctx.drawImage(sprite, p.x - size / 2, p.y - size / 2, size, size);
     }
+    ctx.globalAlpha = 1;
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);

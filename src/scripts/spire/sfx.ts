@@ -169,6 +169,35 @@ export class Sfx {
     this.burst(ctx, t, 'lowpass', 600, 0.5, 0.2, 0.5);
   }
 
+  /** 可达鸭：锯齿波过两个共振峰，音高往下掉，像一声「嘎」 */
+  quack() {
+    const ctx = this.go();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.type = 'sawtooth';
+    const base = 520 + Math.random() * 80;
+    o.frequency.setValueAtTime(base, t);
+    o.frequency.exponentialRampToValueAtTime(base * 0.62, t + 0.2);
+    const g = ctx.createGain();
+    this.env(g, t, 0.012, 0.22, 0.2);
+    for (const [f, q, v] of [
+      [1150, 6, 1],
+      [2400, 8, 0.5],
+    ]) {
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = f;
+      bp.Q.value = q;
+      const gg = ctx.createGain();
+      gg.gain.value = v;
+      o.connect(bp).connect(gg).connect(g);
+    }
+    g.connect(this.master);
+    o.start(t);
+    o.stop(t + 0.3);
+  }
+
   /** 选了一个选项 */
   pick() {
     const ctx = this.go();

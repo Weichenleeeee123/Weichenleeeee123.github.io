@@ -22,3 +22,19 @@ document.addEventListener('keydown', (e) => {
     d.querySelector('summary')?.focus();
   });
 });
+
+/* 爬塔是后来加的：以前抽到别的风格的人没见过它，菜单上标个「新」，去过一次就不再标 */
+let visited = true;
+try {
+  visited = localStorage.getItem('wc-spire-visited') === '1';
+} catch {
+  /* 隐私模式就不标了 */
+}
+if (!visited) {
+  document.querySelectorAll<HTMLDetailsElement>('[data-style-menu]').forEach((d) => {
+    const a = d.querySelector('a[data-style-switch="spire"]:not([aria-current])');
+    if (!a) return;
+    d.classList.add('has-new');
+    a.classList.add('is-new');
+  });
+}

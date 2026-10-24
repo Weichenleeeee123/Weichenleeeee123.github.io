@@ -25,7 +25,7 @@ const STEP = 128;
 const steps = floors.length - 1; // 不算 Boss
 const BOSS_Y = 168;
 const TOP_Y = BOSS_Y + 236;
-const H = TOP_Y + (steps - 1) * STEP + 140;
+const H = TOP_Y + (steps - 1) * STEP + 200;
 const laneX = (l: number) => 152 + l * 84;
 const floorY = (f: number) => TOP_Y + (steps - 1 - f) * STEP;
 
@@ -127,6 +127,8 @@ const byCode = Object.fromEntries(projects.map((p) => [p.code, p]));
 const floorOf = Object.fromEntries(floors.map((f, i) => [f.code ?? `_${i}`, i]));
 const rarityName = { common: '普通', uncommon: '罕见', rare: '稀有' };
 const seenTotal = floors.length;
+/* 敌人的血量：纯属玩笑，精英厚一点，费用高的厚一点 */
+const hpOf = (kind: Kind, cost: number) => (kind === 'elite' ? 82 + cost * 4 : 38 + cost * 7);
 
 /* 节点图标：64×64，墨水画 */
 const icon: Record<Kind, string> = {
@@ -237,8 +239,8 @@ const potionIcons = radio.map((_, i) => potion(potionColors[i] ?? '#ccc'));
             <p><b>初始遗物 · 737 模型</b>模拟飞行 2020 年开始。<a href="/cockpit/" data-style-switch="cockpit">带着它去驾驶舱 →</a></p>
           </div>
         </div>
-        <div class="hero-portrait" aria-hidden="true">
-          <div class="hp-arch">
+        <div class="hero-portrait">
+          <div class="hp-arch" data-duck role="button" tabindex="0" aria-label="戳一下可达鸭">
             <Image src={avatar} alt="" width={420} height={420} class="hp-img" loading="eager" />
             <span class="hp-glow"></span>
           </div>
@@ -311,6 +313,11 @@ const potionIcons = radio.map((_, i) => potion(potionColors[i] ?? '#ccc'));
             </g>
           </g>
 
+          <g class="start" transform={`translate(${realNodes[0][0]} ${realNodes[0][1] + 84})`} aria-hidden="true">
+            <path d="M0 26V-6M-9 3 0-8 9 3" />
+            <text y="50">从这里出发</text>
+          </g>
+
           <g class="dates" aria-hidden="true">
             {realNodes.map(([, y], f) => <text x="26" y={y + 6} class:list={[floors[f].kind]}>{floors[f].date}</text>)}
             <text x="26" y={BOSS_Y + 6}>{floors[steps].date}</text>
@@ -349,6 +356,8 @@ const potionIcons = radio.map((_, i) => potion(potionColors[i] ?? '#ccc'));
           </a>
 
           <g class="token" data-token transform={`translate(${realNodes[steps - 1][0]} ${realNodes[steps - 1][1]})`} aria-hidden="true">
+            <circle class="here" r="34" />
+            <circle class="here here-2" r="34" />
             <g class="tok-hop">
               <g transform="translate(0 -56)">
                 <circle r="22" class="tok-rim" />
@@ -377,6 +386,10 @@ const potionIcons = radio.map((_, i) => potion(potionColors[i] ?? '#ccc'));
         <p class="lg-note">墨线是真走过的路，<br />淡的是没走的岔路。</p>
       </aside>
 
+      <button type="button" class="lg-toggle" data-legend-toggle aria-expanded="false" aria-label="图例">
+        <svg viewBox="-32 -32 64 64" aria-hidden="true"><use href="#i-event" x="-24" y="-24" width="48" height="48" /></svg>
+      </button>
+
       <p class="map-hint" data-map-hint>点地图上任意一层 · 也可以直接看<a href="#deck">牌组</a></p>
     </main>
 
@@ -384,7 +397,7 @@ const potionIcons = radio.map((_, i) => potion(potionColors[i] ?? '#ccc'));
     <div class="screens" data-screens>
       {
         floors.map((f, i) => {
-          const next = i < steps ? `#f-${i + 1}` : '';
+          const next = i < steps ? `#f-${i + 1}` : '#f-0';
           const nav = (
             <nav class="sc-nav">
               <a class="sc-back" href="#map" data-back>
@@ -392,7 +405,7 @@ const potionIcons = radio.map((_, i) => potion(potionColors[i] ?? '#ccc'));
               </a>
               {next && (
                 <a class="sc-next" href={next}>
-                  <span>继续往上</span>
+                  <span>{i < steps ? '继续往上' : '从头再爬'}</span>
                 </a>
               )}
             </nav>
@@ -407,10 +420,28 @@ const potionIcons = radio.map((_, i) => potion(potionColors[i] ?? '#ccc'));
                 <div class="sc-in">
                   <header class="sc-head">
                     <p class="ribbon">{f.kind === 'elite' ? '精英击败' : '战斗胜利'}</p>
-                    <p class="sc-foe">
-                      击败了「{meta.foe}」<span>第 {i + 1} 层 · {p.when}</span>
-                    </p>
                   </header>
+                  <div class="foe" aria-label={`击败了「${meta.foe}」`}>
+                    <svg viewBox="-32 -32 64 64" class="foe-ic" aria-hidden="true">
+                      <use href={f.kind === 'elite' ? '#i-elite' : '#i-enemy'} x="-30" y="-30" width="60" height="60" />
+                    </svg>
+                    <div class="foe-body">
+                      <p class="foe-name">
+                        <b>{meta.foe}</b>
+                        <span>第 {i + 1} 层 · {p.when}</span>
+                      </p>
+                      <div class="hp" aria-hidden="true">
+                        <i />
+                        <span>
+                          0 / {hpOf(f.kind, meta.cost)}
+                        </span>
+                      </div>
+                    </div>
+                    <span class="dmg" aria-hidden="true">
+                      -{hpOf(f.kind, meta.cost)}
+                    </span>
+                    <span class="beaten">已击败</span>
+                  </div>
                   <div class="fight">
                     <div class="flip" data-flip>
                       <div class="flip-in">
@@ -726,11 +757,18 @@ const potionIcons = radio.map((_, i) => potion(potionColors[i] ?? '#ccc'));
           return (
             <section class="scr scr-boss" id={`f-${i}`} data-floor={i} aria-label="Boss：下一位 Boss">
               <div class="sc-in boss">
+                <header class="sc-head">
+                  <p class="ribbon ribbon-boss">Boss</p>
+                </header>
                 <svg viewBox="-80 -80 160 160" class="boss-emblem" aria-hidden="true">
                   <use href="#i-boss" x="-80" y="-80" width="160" height="160" />
                 </svg>
                 <p class="boss-kicker">Boss · 第 {i + 1} 层 · {f.date}</p>
                 <h3 class="boss-title">{f.label}</h3>
+                <div class="hp hp-boss" aria-hidden="true">
+                  <i />
+                  <span>??? / ???</span>
+                </div>
                 <p class="boss-text">这一层的 Boss 还没出现。可能是下一个想法，可能是一起做事的人，也可能是我未来的老板。</p>
                 <ul class="boss-potions">
                   {radio.map((r, k) => (
@@ -790,6 +828,7 @@ const potionIcons = radio.map((_, i) => potion(potionColors[i] ?? '#ccc'));
       </section>
     </div>
 
+    <div class="inspect" data-inspect hidden></div>
     <div class="sp-tip" data-tip-box aria-hidden="true"></div>
     <div class="sp-toast" data-toast role="status" aria-live="polite"></div>
     <div class="sp-fade" aria-hidden="true"></div>

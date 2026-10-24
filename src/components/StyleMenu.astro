@@ -100,6 +100,42 @@ const styles = [
     opacity: 0.6;
   }
 
+  /* 没去过的新风格：按钮上一个小红点，菜单里一个「新」 */
+  .style-menu.has-new > summary {
+    position: relative;
+  }
+
+  .style-menu.has-new > summary::after {
+    content: '';
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #ff4d3d;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5);
+    animation: sm-dot 1.6s ease-in-out infinite;
+  }
+
+  .sm-pop a.is-new b::after {
+    content: '新';
+    margin-left: 6px;
+    padding: 0 5px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    vertical-align: 2px;
+    color: #fff;
+    background: #e2453a;
+  }
+
+  @keyframes sm-dot {
+    50% {
+      transform: scale(1.35);
+    }
+  }
+
   .sm-pop a[aria-current='page'] {
     pointer-events: none;
   }
