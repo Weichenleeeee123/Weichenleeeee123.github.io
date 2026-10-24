@@ -5,12 +5,14 @@
   wc-serif（思源宋体 Black）：名字、花名、各块面板的标题、印章、底部导航的名字；爬塔页的标题、按钮、卡名
   wc-hand （霞鹜文楷）：白板上的技能、软木板上的日期、数据带；爬塔地图上的小字、卡牌描述
 爬塔页另外截一套（wc-serif-spire / wc-hand-spire），房间页不用多下载。
+普通版（/work/）只用宋体，单独一套 wc-serif-work：名字、作品名、各块标题、印章。
 其余文字仍走系统字体。改了 site.ts、spire.ts 里这些字段后要重新跑一次，否则新出现的字会退回系统字体。
 
 两款都是 SIL OFL 1.1。截取子集算修改，按协议改了字体名（WC Serif / WC Hand）。
 
 用法：
   python scripts/subset-fonts.py --serif D:/font-work/NotoSerifSC-Black.otf --hand D:/font-work/LXGWWenKai-Regular.ttf
+  只重做其中几套：加 --only work spire（studio = 房间那两套）
 依赖：fonttools、brotli
 """
 
@@ -73,7 +75,21 @@ def collect():
         + hobbies
         + '现在墨线是真走过的路淡没岔起—从这里出发'
     )
-    return [serif + ASCII, hand + ASCII, spire_serif + ASCII, spire_hand + ASCII]
+    work = (ROOT / 'src/pages/work.astro').read_text(encoding='utf-8')
+    work_serif = (
+        fields(site, 'name')
+        + fields(site, 'callsign')
+        + fields(site, 'stamp')
+        + fields(work, 'name')
+        # 页面上写死的标题：<h2>作品</h2> 这类
+        + ''.join(re.findall(r'<h[1-4][^>]*>([^<{]+)<', work))
+        + '在读家个年「」·—→'
+    )
+    return {
+        'studio': [('serif', serif + ASCII, 'wc-serif.woff2'), ('hand', hand + ASCII, 'wc-hand.woff2')],
+        'spire': [('serif', spire_serif + ASCII, 'wc-serif-spire.woff2'), ('hand', spire_hand + ASCII, 'wc-hand-spire.woff2')],
+        'work': [('serif', work_serif + ASCII, 'wc-serif-work.woff2')],
+    }
 
 
 def build(src: str, text: str, family: str, out: Path):
@@ -102,13 +118,15 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--serif', required=True)
     ap.add_argument('--hand', required=True)
+    ap.add_argument('--only', nargs='*', choices=['studio', 'spire', 'work'])
     args = ap.parse_args()
-    serif, hand, spire_serif, spire_hand = collect()
+    sets = collect()
     OUT.mkdir(parents=True, exist_ok=True)
-    build(args.serif, serif, 'WC Serif', OUT / 'wc-serif.woff2')
-    build(args.hand, hand, 'WC Hand', OUT / 'wc-hand.woff2')
-    build(args.serif, spire_serif, 'WC Serif', OUT / 'wc-serif-spire.woff2')
-    build(args.hand, spire_hand, 'WC Hand', OUT / 'wc-hand-spire.woff2')
+    src = {'serif': args.serif, 'hand': args.hand}
+    family = {'serif': 'WC Serif', 'hand': 'WC Hand'}
+    for page in args.only or sets:
+        for kind, text, name in sets[page]:
+            build(src[kind], text, family[kind], OUT / name)
 
 
 if __name__ == '__main__':

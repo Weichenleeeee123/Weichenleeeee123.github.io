@@ -1,12 +1,13 @@
 # weichen.li
 
-李伟宸（围城）的个人网站，有三种风格：
+李伟宸（围城）的个人网站，有三种风格，外加一页普通版：
 
 - **737 驾驶舱**（`/cockpit/`）：一段可以「飞」的夜航。冷舱开机 → 滚动起飞 → 机长执照 → 巡航飞过 10 个作品 → 备降场 → 飞行日志 → 落地，在无线电上调频联系。
 - **围城的房间**（`/studio/`）：一间切开两面墙的 3D 小屋。显示器是作品、软木板是经历、书架是小项目、白板是技能、海报是关于我、手机是联系方式；台灯、窗户、可达鸭、椅子、书架顶上的 737 模型都能点。右上角「直接看」不转房间，直接把全部内容排成一页。
 - **围城爬塔**（`/spire/`）：照《杀戮尖塔》的地图做的。打开先是角色档案（名字、介绍、学校一屏看完），「出发」后是一张从下往上爬的羊皮纸地图：问号是经历里的事件，敌人和精英是作品（拿奖的是精英），篝火是爱好，宝箱是小项目，商人是技能，顶上的 Boss 是联系方式。每个作品是一张卡牌，右上角「牌组」一页看完全部作品。顶栏的遗物是技能、药水是联系方式。没有 3D，也不用 three.js。
+- **普通版**（`/work/`）：常规的作品集，一页从上往下看完，不用学怎么玩。给招聘、评委、在微信里点开链接的人。四个主力作品带封面大图，其余作品、小项目、经历、技能、联系依次排下来；跟随系统深色模式；「存成 PDF 简历」直接调打印，打印样式会把它排成一份 A4 简历（去掉封面和导航，链接地址印出来）。
 
-首页 `/` 第一次打开在三种里随机抽一种，记在 localStorage（`wc-style`）里，之后一直是这一种；每种风格的右上角都有「换个风格」菜单（`src/components/StyleMenu.astro`）。开了「减少动态效果」的访客固定进爬塔，搜索引擎留在驾驶舱。要指定给别人看哪种，就发 `/cockpit/`、`/studio/` 或 `/spire/`。
+首页 `/` 第一次打开在三种风格里随机抽一种，记在 localStorage（`wc-style`）里，之后一直是这一种；每种风格的右上角都有「换个风格」菜单（`src/components/StyleMenu.astro`），菜单最下面是普通版。普通版不进随机，但在菜单里选过它的人，之后打开首页就是它。开了「减少动态效果」的访客进普通版，搜索引擎留在驾驶舱。要指定给别人看哪种，就发 `/cockpit/`、`/studio/`、`/spire/` 或 `/work/`；投简历、发给评委建议直接发 `/work/`。
 
 Astro 静态输出 + three.js，推到 `main` 由 GitHub Actions 部署到 GitHub Pages，自定义域名 weichen.li（Dynadot 注册，`public/CNAME`）。旧地址 weichenleeeee123.github.io 会自动跳到新域名。
 
@@ -45,6 +46,7 @@ npm run build    # 输出到 dist/
 
 ```bash
 python scripts/subset-fonts.py --serif <NotoSerifSC-Black.otf> --hand <LXGWWenKai-Regular.ttf>
+# 只重做某几页的：--only work（可选 studio / spire / work）
 ```
 
 不跑也不会坏，新出现的字会退回系统字体。
@@ -61,6 +63,7 @@ python scripts/subset-fonts.py --serif <NotoSerifSC-Black.otf> --hand <LXGWWenKa
 | `src/scripts/studio/sfx.ts` | 房间的音效（现场合成）和唱机的背景音乐；`wc-sound`、`wc-music` 记开关 |
 | `scripts/gen-lofi.py` | 房间背景音乐 `public/audio/room-lofi.mp3`：原创 lo-fi 循环，全部代码合成，首尾无缝 |
 | `src/styles/studio.css` | 房间的样式 |
+| `src/pages/work.astro` | 普通版作品集，内容全读 `site.ts`；`src/styles/work.css` 是样式（含深色和打印成简历），`src/scripts/work.ts` 是滚动淡入、目录高亮、复制邮箱、打印。标题字体是单独的 `wc-serif-work.woff2`（约 69 KB） |
 | `src/pages/spire.astro` | 爬塔页面：角色档案、地图（编译时排好的 SVG）、每一层的画面、牌组。没有 JS 时从上往下就是一张普通网页 |
 | `src/components/SpireCard.astro` | 一张作品卡：卡面颜色看类型，边框看稀有度，没截图的作品画一个线条小图 |
 | `src/scripts/spire/main.ts` | 爬塔的路由（`#hero` / `#map` / `#f-N` / `#deck`）、开场墨线动画、小鸭子走格子、提示框、卡牌倾斜、火星 |

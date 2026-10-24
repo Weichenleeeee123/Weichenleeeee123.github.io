@@ -1,0 +1,278 @@
+---
+import { Image } from 'astro:assets';
+import Base from '../layouts/Base.astro';
+import StyleMenu from '../components/StyleMenu.astro';
+import avatar from '../assets/avatar.jpg';
+import { site, profile, stats, projects, alternates, logbook, checklist, radio } from '../data/site';
+import '../styles/work.css';
+
+/*
+ * 普通版：一页从上往下看完，不用学怎么玩。
+ * 给招聘、评委、在微信里点开链接的人；也是打印成简历的那一版。
+ * 内容全部来自 site.ts，跟另外三种风格同一份。
+ */
+
+// 有封面的是主力作品，放大了排；其余按时间从新到旧
+const order = ['KINOL', 'ALPHA', 'YJSHI', 'QMSHT'];
+const featured = order.map((c) => projects.find((p) => p.code === c)!).filter(Boolean);
+const others = projects.filter((p) => !order.includes(p.code)).reverse();
+const timeline = [...logbook].reverse();
+const email = radio.find((r) => r.label === '邮件')!;
+const elsewhere = radio.filter((r) => r !== email);
+
+const plays = [
+  { href: '/cockpit/', id: 'cockpit', name: '737 驾驶舱', note: '从开机到落地，飞一段夜航，作品是航路点' },
+  { href: '/studio/', id: 'studio', name: '围城的房间', note: '一间能转着看的 3D 小屋，东西都能点' },
+  { href: '/spire/', id: 'spire', name: '围城爬塔', note: '一张往上爬的地图，每个作品是一张卡牌' },
+];
+---
+
+<Base title="作品集" description={`${site.name}（${site.callsign}）的作品集：${site.motto}`} themeColor="#f3efe6">
+  <a class="wk-skip" href="#works">跳到作品</a>
+
+  <header class="wk-bar">
+    <a class="wk-brand" href="#top" aria-label="回到顶部">
+      <span class="wk-seal" aria-hidden="true">围城</span>
+      <span>{site.name}</span>
+    </a>
+    <nav class="wk-nav" aria-label="页面目录">
+      <a href="#works">作品</a>
+      <a href="#path">经历</a>
+      <a href="#skills">技能</a>
+      <a href="#contact">联系</a>
+    </nav>
+    <StyleMenu current="work" summaryClass="wk-play" label="换个玩法" />
+  </header>
+
+  <main id="top">
+    <!-- 开头：是谁、在做什么、怎么找到 -->
+    <section class="wk-hero">
+      <div class="wk-hero-text">
+        <p class="wk-kicker"><span>{site.nameEn}</span><span>{profile.ratings}</span></p>
+        <h1 class="wk-name">
+          {site.name}<span class="wk-alias">「{site.callsign}」</span>
+        </h1>
+        <p class="wk-lead">{site.motto}</p>
+        <ul class="wk-facts">
+          <li><b>在</b>{profile.base}</li>
+          <li><b>读</b>{profile.school}</li>
+          <li><b>家</b>{profile.home}</li>
+        </ul>
+        <div class="wk-cta">
+          <a class="wk-btn wk-btn-ink" href={email.href}>发邮件给我</a>
+          <a class="wk-btn" href="https://github.com/Weichenleeeee123">GitHub</a>
+          <button class="wk-btn wk-btn-ghost" type="button" data-print>存成 PDF 简历</button>
+        </div>
+      </div>
+      <figure class="wk-portrait">
+        <Image src={avatar} alt="围城的头像：一只可达鸭" width={360} height={360} loading="eager" />
+        <figcaption>头像是可达鸭，本人不是。</figcaption>
+      </figure>
+      <dl class="wk-stats">
+        {
+          stats.map((s) => (
+            <div>
+              <dt>{s.label.replace(/^个\s*/, '')}</dt>
+              <dd>
+                {s.value}
+                <small>{s.suffix.trim() || (s.label.startsWith('个') ? '个' : '')}</small>
+              </dd>
+            </div>
+          ))
+        }
+      </dl>
+    </section>
+
+    <!-- 主力作品 -->
+    <section class="wk-sec" id="works" aria-labelledby="works-h">
+      <header class="wk-sec-head">
+        <span class="wk-no">01</span>
+        <h2 id="works-h">作品</h2>
+        <p>挑了四个最能说明我在做什么的。都是从想法一路做到能用。</p>
+      </header>
+
+      <ol class="wk-feature">
+        {
+          featured.map((p, i) => {
+            // 有链接的封面能点，没有的就只是一张图
+            const Cover = p.links[0] ? 'a' : 'div';
+            return (
+            <li class="wk-case" data-reveal>
+              <Cover class="wk-cover" href={p.links[0]?.href} tabindex={p.links[0] ? -1 : undefined}>
+                {p.image && <Image src={p.image} alt={`${p.name} 的界面截图`} widths={[640, 1100, 1600]} sizes="(max-width: 860px) 94vw, 58vw" loading={i === 0 ? 'eager' : 'lazy'} />}
+              </Cover>
+              <div class="wk-case-body">
+                <p class="wk-meta">
+                  <span class="wk-idx">{String(i + 1).padStart(2, '0')}</span>
+                  <span>{p.when}</span>
+                  <span>{p.stack}</span>
+                </p>
+                <h3>{p.name}</h3>
+                <p class="wk-sub">{p.sub}</p>
+                {p.award && <p class="wk-award">{p.award}</p>}
+                <p class="wk-desc">{p.desc}</p>
+                {p.role && (
+                  <p class="wk-role">
+                    <b>我负责</b>
+                    {p.role}
+                  </p>
+                )}
+                {p.links.length > 0 && (
+                  <p class="wk-links">
+                    {p.links.map((l) => (
+                      <a href={l.href}>{l.text} ↗</a>
+                    ))}
+                  </p>
+                )}
+              </div>
+            </li>
+            );
+          })
+        }
+      </ol>
+
+      <h3 class="wk-subhead">其它作品</h3>
+      <ul class="wk-grid">
+        {
+          others.map((p) => (
+            <li class="wk-card" data-reveal>
+              <p class="wk-meta">
+                <span>{p.when}</span>
+                <span>{p.stack}</span>
+              </p>
+              <h4>{p.name}</h4>
+              <p class="wk-sub">{p.sub}</p>
+              <p class="wk-desc">{p.desc}</p>
+              {p.links.length > 0 && (
+                <p class="wk-links">
+                  {p.links.map((l) => (
+                    <a href={l.href}>{l.text} ↗</a>
+                  ))}
+                </p>
+              )}
+            </li>
+          ))
+        }
+      </ul>
+
+      <h3 class="wk-subhead">顺手做的小东西</h3>
+      <ul class="wk-mini">
+        {
+          alternates.map((a) => (
+            <li>
+              <a href={a.href}>
+                <b>{a.name}</b>
+                <span>{a.note}</span>
+                <i aria-hidden="true">↗</i>
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </section>
+
+    <!-- 经历：从新到旧 -->
+    <section class="wk-sec" id="path" aria-labelledby="path-h">
+      <header class="wk-sec-head">
+        <span class="wk-no">02</span>
+        <h2 id="path-h">经历</h2>
+        <p>从 2020 年开始玩模拟飞行算起。</p>
+      </header>
+      <ol class="wk-time">
+        {
+          timeline.map((l) => (
+            <li data-reveal class:list={{ 'is-win': !!l.stamp }}>
+              <time>{l.date}</time>
+              <p>
+                {l.remark}
+                {l.stamp && <span class="wk-stamp">{l.stamp}</span>}
+              </p>
+            </li>
+          ))
+        }
+      </ol>
+    </section>
+
+    <!-- 技能和爱好 -->
+    <section class="wk-sec wk-split" id="skills" aria-labelledby="skills-h">
+      <header class="wk-sec-head">
+        <span class="wk-no">03</span>
+        <h2 id="skills-h">技能</h2>
+        <p>做产品的事和写代码的事，我都自己来。</p>
+      </header>
+      <div class="wk-cols">
+        <ul class="wk-tags">
+          {
+            checklist.map((c) => (
+              <li>
+                {c.item}
+                {c.state !== 'CHECKED' && <small>{c.state}</small>}
+              </li>
+            ))
+          }
+        </ul>
+        <div class="wk-off">
+          <h3>下班以后</h3>
+          <ul>{profile.hobbies.map((h) => <li>{h}</li>)}</ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 联系 -->
+    <section class="wk-sec wk-contact" id="contact" aria-labelledby="contact-h">
+      <header class="wk-sec-head">
+        <span class="wk-no">04</span>
+        <h2 id="contact-h">联系</h2>
+        <p>想一起做点什么，或者只是聊聊，都可以。邮件回得最快。</p>
+      </header>
+      <div class="wk-mail">
+        <a href={email.href}>{email.value}</a>
+        <button type="button" class="wk-copy" data-copy={email.value}>复制</button>
+      </div>
+      <ul class="wk-else">
+        {
+          elsewhere.map((r) =>
+            r.href ? (
+              <li>
+                <a href={r.href}>
+                  <span>{r.label}</span>
+                  {r.value}
+                </a>
+              </li>
+            ) : (
+              <li>
+                <span>{r.label}</span>
+                {r.value}
+              </li>
+            ),
+          )
+        }
+      </ul>
+    </section>
+  </main>
+
+  <!-- 另外三种玩法 -->
+  <footer class="wk-foot">
+    <p class="wk-foot-head">这个网站还有三种玩法，内容一样，只是换了一种看法：</p>
+    <ul class="wk-plays">
+      {
+        plays.map((p) => (
+          <li>
+            <a href={p.href} data-style-switch={p.id}>
+              <b>{p.name} →</b>
+              <span>{p.note}</span>
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+    <p class="wk-copyline">© 2026 {site.name} · {site.url.replace('https://', '')}</p>
+  </footer>
+
+  <div class="wk-toast" role="status" aria-live="polite" hidden></div>
+
+  <script>
+    import '../scripts/style-pref';
+    import '../scripts/work';
+  </script>
+</Base>

@@ -7,8 +7,9 @@ import Cockpit from '../components/Cockpit.astro';
   <!--
     首页有三种风格：驾驶舱（就是这一页）、「围城的房间」（/studio/）和「围城爬塔」（/spire/）。
     第一次来随机抽一种并记在本地，之后一直是这一种；页面角上可以换。
-    想指定给别人看哪种，就发 /cockpit/、/studio/ 或 /spire/。
-    开了「减少动态」的人直接去爬塔：它是纯网页，没有 3D。
+    另有一页普通版（/work/）不进随机：在菜单里选过它的人，之后打开首页就是它。
+    想指定给别人看哪种，就发 /cockpit/、/studio/、/spire/ 或 /work/。
+    开了「减少动态」的人直接去普通版。
     搜索引擎和打不开 localStorage 的情况留在这一页，不跳转。
   -->
   <script is:inline slot="head">
@@ -18,10 +19,10 @@ import Cockpit from '../components/Cockpit.astro';
       var s;
       try {
         s = localStorage.getItem(KEY);
-        if (s !== 'cockpit' && s !== 'studio' && s !== 'spire') {
+        if (s !== 'cockpit' && s !== 'studio' && s !== 'spire' && s !== 'work') {
           var calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
           var all = ['cockpit', 'studio', 'spire'];
-          s = calm ? 'spire' : all[Math.floor(Math.random() * all.length)];
+          s = calm ? 'work' : all[Math.floor(Math.random() * all.length)];
           localStorage.setItem(KEY, s);
         }
       } catch (e) {

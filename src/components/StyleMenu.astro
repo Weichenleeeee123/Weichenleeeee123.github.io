@@ -5,7 +5,7 @@
  * 外观由各页自己定：summaryClass 给按钮套上本页的样式，弹层颜色用 --sm-* 变量改。
  */
 interface Props {
-  current: 'cockpit' | 'studio' | 'spire';
+  current: 'cockpit' | 'studio' | 'spire' | 'work';
   label?: string;
   summaryClass?: string;
   class?: string;
@@ -18,6 +18,8 @@ const styles = [
   { id: 'studio', href: '/studio/', name: '围城的房间', note: '一间能转着看的 3D 小屋' },
   { id: 'spire', href: '/spire/', name: '围城爬塔', note: '一张往上爬的地图，作品是卡牌' },
 ];
+/** 普通版不算一种「玩法」，单独放在最下面 */
+const plain = { id: 'work', href: '/work/', name: '普通版', note: '一页看完，不用学怎么玩' };
 ---
 
 <details class:list={['style-menu', cls]} data-style-menu>
@@ -32,6 +34,10 @@ const styles = [
         </a>
       ))
     }
+    <a class="sm-plain" href={plain.href} data-style-switch={plain.id} aria-current={current === plain.id ? 'page' : undefined}>
+      <b>{plain.name}</b>
+      <span>{current === plain.id ? '正在看' : plain.note}</span>
+    </a>
   </div>
 </details>
 
@@ -93,6 +99,12 @@ const styles = [
   .sm-pop a b {
     font-size: 14px;
     font-weight: 600;
+  }
+
+  .sm-pop a.sm-plain {
+    margin-top: 6px;
+    border-top: 1px solid var(--sm-line, rgba(255, 255, 255, 0.12));
+    border-radius: 0 0 calc(var(--sm-radius, 12px) - 4px) calc(var(--sm-radius, 12px) - 4px);
   }
 
   .sm-pop a span {
