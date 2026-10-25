@@ -128,8 +128,7 @@ export const projects: Project[] = [
     desc: '回响48H 黑客松，杭州银行赛题。输入企业名和你要干什么，它去监管、法院、登记和新闻里找真实记录，跟公司的说法对照，生成一份普通人看得懂的报告。查不到的地方会说清楚是没查成、查不到还是不适用。',
     stack: 'Python · 大模型 · 公开数据',
     links: [
-      { text: 'qier.asia', href: 'https://qier.asia' },
-      { text: 'GitHub', href: 'https://github.com/Weichenleeeee123/xray' },
+      { text: 'GitHub', href: 'https://github.com/Weichenleeeee123/qier' },
     ],
   },
   {
