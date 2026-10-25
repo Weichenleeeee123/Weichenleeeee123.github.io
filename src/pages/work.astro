@@ -142,6 +142,7 @@ const plays = [
               </p>
               <h4>{p.name}</h4>
               <p class="wk-sub">{p.sub}</p>
+              {p.award && <p class="wk-award">{p.award}</p>}
               <p class="wk-desc">{p.desc}</p>
               {p.links.length > 0 && (
                 <p class="wk-links">

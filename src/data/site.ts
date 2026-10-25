@@ -27,7 +27,7 @@ export const profile = {
 /** 首屏的数据带 */
 export const stats = [
   { value: 10, suffix: '', label: '个作品' },
-  { value: 2, suffix: '', label: '个比赛大奖' },
+  { value: 3, suffix: '', label: '个比赛奖项' },
   { value: 1, suffix: '', label: '个微软合并的 PR' },
   { value: 6, suffix: ' 年', label: '模拟飞行' },
 ];
@@ -124,6 +124,7 @@ export const projects: Project[] = [
     name: 'X-Ray 透视·真相',
     sub: '对照公司说的和真实记录',
     when: '2026.10',
+    award: '回响48H 黑客松 · 赛道二等奖',
     desc: '回响48H 黑客松，杭州银行赛题。输入企业名和你要干什么，它去监管、法院、登记和新闻里找真实记录，跟公司的说法对照，生成一份普通人看得懂的报告。查不到的地方会说清楚是没查成、查不到还是不适用。',
     stack: 'Python · 大模型 · 公开数据',
     links: [
@@ -173,7 +174,7 @@ export const logbook = [
   { date: '2026.06', from: 'ZGSZ', to: '—', remark: '东莞中学毕业' },
   { date: '2026.07', from: 'ZGSZ', to: 'ZSHC', remark: 'AdventureX 2026，人生第一次线下黑客松，PandaAI 赛道一等奖', stamp: '冠军' },
   { date: '2026.09', from: 'ZGSZ', to: 'ZSNJ', remark: '进入南京农业大学，国际经济与贸易' },
-  { date: '2026.10', from: 'ZSNJ', to: 'HACK', remark: '回响48H 黑客松，做 X-Ray；同月「围城Lab」开始连更' },
+  { date: '2026.10', from: 'ZSNJ', to: 'HACK', remark: '回响48H 黑客松，X-Ray 拿下赛道二等奖；同月「围城Lab」开始连更' },
 ];
 
 /** 起飞前检查单 = 技能 */

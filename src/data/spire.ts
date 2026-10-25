@@ -33,7 +33,7 @@ export const cards: Record<string, { type: CardType; rarity: Rarity; cost: numbe
   YUWEN: { type: '技能', rarity: 'common', cost: 1, foe: '高考作文', text: '审题、立意、提纲、范文、批改。\n**开源**，有人在用。' },
   QMSHT: { type: '能力', rarity: 'uncommon', cost: 2, foe: '一整条不会说话的街', text: '你说的话会沿着关系\n**传遍整条街**。' },
   ALPHA: { type: '攻击', rarity: 'rare', cost: 2, foe: '四个人，四天', text: '召唤一支 **AI 投研团队**。\n每个结论都要有出处。\n获得 **一等奖**。' },
-  XRAYS: { type: '攻击', rarity: 'uncommon', cost: 2, foe: '48 小时', text: '对照公司的说法和 **真实记录**。\n查不到的会写清楚。' },
+  XRAYS: { type: '攻击', rarity: 'uncommon', cost: 2, foe: '48 小时', text: '对照公司的说法和 **真实记录**。\n查不到的会写清楚。\n获得 **二等奖**。' },
   WCLAB: { type: '能力', rarity: 'uncommon', cost: 1, foe: '2 秒跳出率', text: '每期结束时：看 **完播率**，\n改下一期。' },
   COOPS: { type: '技能', rarity: 'common', cost: 0, foe: '各干各的 agent', text: '你和队友的 agent\n**共用一块任务板**。不用服务器。' },
 };
@@ -98,7 +98,7 @@ export const floors: Floor[] = [
       { pick: '[去写代码]', text: '课外的事。', result: '一个月后是回响48H 黑客松，接着是围城Lab 和 Coopagents。' },
     ],
   },
-  { kind: 'enemy', date: '2026.10', label: 'X-Ray', code: 'XRAYS' },
+  { kind: 'elite', date: '2026.10', label: 'X-Ray', code: 'XRAYS' },
   { kind: 'enemy', date: '2026.10', label: '围城Lab', code: 'WCLAB' },
   { kind: 'enemy', date: '2026.10', label: 'Coopagents', code: 'COOPS' },
   { kind: 'shop', date: '现在', label: '商人' },
