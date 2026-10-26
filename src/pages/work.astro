@@ -13,7 +13,7 @@ import '../styles/work.css';
  */
 
 // 有封面的是主力作品，放大了排；其余按时间从新到旧
-const order = ['KINOL', 'ALPHA', 'YJSHI', 'QMSHT'];
+const order = ['KINOL', 'ALPHA', 'CAMPS', 'YJSHI', 'QMSHT'];
 const featured = order.map((c) => projects.find((p) => p.code === c)!).filter(Boolean);
 const others = projects.filter((p) => !order.includes(p.code)).reverse();
 const timeline = [...logbook].reverse();

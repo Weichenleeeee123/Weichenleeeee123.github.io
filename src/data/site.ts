@@ -3,6 +3,7 @@ import alphabit from '../assets/covers/alphabit.png';
 import yingjushi from '../assets/covers/yingjushi.png';
 import kinolens from '../assets/covers/kinolens.png';
 import qingming from '../assets/covers/qingming.jpg';
+import campus from '../assets/covers/campus.jpg';
 
 export const site = {
   name: '李伟宸',
@@ -26,7 +27,7 @@ export const profile = {
 
 /** 首屏的数据带 */
 export const stats = [
-  { value: 10, suffix: '', label: '个作品' },
+  { value: 11, suffix: '', label: '个作品' },
   { value: 3, suffix: '', label: '个比赛奖项' },
   { value: 1, suffix: '', label: '个微软合并的 PR' },
   { value: 6, suffix: ' 年', label: '模拟飞行' },
@@ -118,6 +119,16 @@ export const projects: Project[] = [
     stack: 'LangGraph · A2A',
     links: [{ text: 'GitHub', href: 'https://github.com/Alia0415/AlphaBit-Coach' }],
     image: alphabit,
+  },
+  {
+    code: 'CAMPS',
+    name: '东莞中学校园重建',
+    sub: '把母校一栋一栋建回来',
+    when: '2026.09',
+    desc: '用 GPT-6 Astra 写 Blender Python 脚本，照着实拍照片、航拍视频和 OpenStreetMap，把东莞中学高中校区建成 3D 模型：教学楼、体育馆、图书馆、宿舍食堂、进士故居。从 v002 迭代到 v024，每一版都有验证脚本核对间距、标高和通行关系；有来源的事实和估计值分开记，不拿通用校园模板凑。',
+    stack: 'Blender · Python · GPT-6 Astra',
+    links: [],
+    image: campus,
   },
   {
     code: 'XRAYS',

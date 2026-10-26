@@ -63,7 +63,7 @@ function passProgress(el: HTMLElement) {
 export type Legs = Record<'takeoff' | 'about' | 'cruise' | 'logbook' | 'landing', HTMLElement>;
 
 /** 航路点航向：作品之间左右转，转弯时压坡度 */
-export const routeHeadings = [240, 262, 228, 251, 275, 243, 219, 247, 270, 236];
+export const routeHeadings = [240, 262, 228, 251, 275, 243, 219, 247, 258, 270, 236];
 
 export function target(legs: Legs, waypoints: number): Flight {
   const f = blank();
